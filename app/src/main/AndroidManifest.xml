@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.daily.healthlife">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- 拍照识别：不声明也能靠系统相机 App 兜底，声明后部分机型可直接调用相机 -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <application
+        android:name=".App"
+        android:allowBackup="false" android:icon="@mipmap/ic_launcher" android:label="日常 · 健康生活"
+        android:roundIcon="@mipmap/ic_launcher_round" android:supportsRtl="true" android:usesCleartextTraffic="true"
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+        
+        <!-- 【关键修改】添加了 android:windowSoftInputMode="adjustResize" -->
+        <activity android:name=".MainActivity" 
+            android:exported="true" 
+            android:launchMode="singleTask" 
+            android:windowSoftInputMode="adjustResize" 
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|uiMode|density|fontScale|locale|layoutDirection|mcc|mnc|touchscreen">
+            
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="healthlife" android:host="jump" />
+            </intent-filter>
+        </activity>
+        
+        <receiver android:name=".HealthWidgetProvider" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.daily.healthlife.WIDGET_TOGGLE_ITEM" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_health_card_info" />
+        </receiver>
+        
+        <service android:name=".WalkTimerService" android:exported="false" android:foregroundServiceType="dataSync" />
+
+        <!-- 走动倒计时「时间到」的兜底提醒：即便前台服务被后台清理，精确闹钟也能准时弹通知 -->
+        <receiver android:name=".WalkEndReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="com.daily.healthlife.WALK_END" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 站立提醒的系统级调度：App 关闭/重启后依然能准点触发 -->
+        <receiver android:name=".WalkAlarmReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="com.daily.healthlife.WALK_ALARM" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 晚间小结提醒：每天固定时刻温和提醒一次，点通知直达时间线 -->
+        <receiver android:name=".EveningReminderReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="com.daily.healthlife.EVENING_ALARM" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+        <!-- 拍照识别：给系统相机一个可写的私有文件 Uri，避免相机只返回缩略图导致 WebView 收不到图片 -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.daily.healthlife.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- 手动待办：到点提醒。每条待办一个独立闹钟，删除/完成/过期由页面调用取消 -->
+        <receiver android:name=".TodoAlarmReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="com.daily.healthlife.TODO_FIRE" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

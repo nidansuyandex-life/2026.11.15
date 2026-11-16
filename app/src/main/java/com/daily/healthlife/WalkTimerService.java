@@ -50,6 +50,17 @@ public class WalkTimerService extends Service {
     /** 供 JsBridge 判断是否已在跑，避免重复 startForegroundService */
     public static volatile boolean sRunning = false;
 
+    /** 本次倒计时结束的绝对时刻（0 = 没有在计时）。页面回前台时用它接续剩余秒数 */
+    private static volatile long sEndTs = 0;
+
+    /** 还剩多少秒（0 = 没在跑）。给 JsBridge.getWalkRemainingSec() 用 */
+    public static int remainingSec() {
+        long ts = sEndTs;
+        if (ts <= 0) return 0;
+        long left = ts - System.currentTimeMillis();
+        return left <= 0 ? 0 : (int) Math.ceil(left / 1000.0);
+    }
+
     private CountDownTimer timer;
     private TextToSpeech tts;
     private volatile boolean isTtsReady = false;
@@ -184,6 +195,7 @@ public class WalkTimerService extends Service {
     }
 
     private void startTimer(long ms) {
+        sEndTs = System.currentTimeMillis() + ms;
         try {
             if (timer != null) timer.cancel();
         } catch (Throwable ignored) {}
@@ -199,6 +211,7 @@ public class WalkTimerService extends Service {
                 }
 
                 @Override public void onFinish() {
+                    sEndTs = 0;
                     if (destroyed) return;
                     // 倒计时正常走到 0：取消兜底闹钟，避免重复提醒
                     try { WalkEndReceiver.cancel(getApplicationContext()); } catch (Throwable ignored) {}
@@ -271,6 +284,7 @@ public class WalkTimerService extends Service {
 
     @Override public void onDestroy() {
         sRunning = false;
+        sEndTs = 0;
         destroyed = true;
         try { mainHandler.removeCallbacksAndMessages(null); } catch (Throwable ignored) {}
         try { if (timer != null) timer.cancel(); } catch (Throwable ignored) {}

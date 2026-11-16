@@ -100,23 +100,27 @@ public class JsBridge {
 
     /**
      * 启动 200 秒倒计时服务。
+     *
      * ★ 关键修复：Android 12+ 禁止「后台」启动前台服务，会抛
      *   ForegroundServiceStartNotAllowedException；这个异常发生在 WebView 的
      *   JavaBridge 线程，未捕获会直接杀掉整个进程（用户看到的「闪退」）。
      *   微信来消息把 App 挤到后台时，页面的 15 秒轮询仍可能调到这里。
      *   因此：后台一律不启服务（改发普通通知），且全程 try-catch(Throwable)。
+     *
+     * 返回值 = 这次倒计时是否由原生接管（true 表示「到点」由原生服务播报）。
+     * 页面靠这个返回值决定到点时要不要自己再响一遍，避免原生 TTS 与页面 TTS 叠在一起。
      */
     @JavascriptInterface
-    public void startNativeWalkTimer(int seconds) {
+    public boolean startNativeWalkTimer(int seconds) {
         try {
             Context context = act.getApplicationContext();
             // 倒计时已在跑时不要重复启动，避免多次 startForegroundService 触发系统限制
-            if (WalkTimerService.sRunning) return;
+            if (WalkTimerService.sRunning) return true;
 
             if (!MainActivity.isAppForeground()) {
                 // 后台：只发一条普通通知，绝不 startForegroundService
                 notifySafe("该站起来走动了", "起身活动 2–3 分钟");
-                return;
+                return false;
             }
 
             Intent intent = new Intent(context, WalkTimerService.class);
@@ -127,12 +131,29 @@ public class JsBridge {
                 } else {
                     context.startService(intent);
                 }
+                return true;
             } catch (Throwable t) {
                 // 后台启动被拒 / 权限异常：降级为普通通知，不让异常冒泡
                 android.util.Log.w("JsBridge", "startForegroundService denied, fallback to notification", t);
                 notifySafe("该站起来走动了", "起身活动 2–3 分钟");
+                return false;
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    /**
+     * 原生倒计时还剩多少秒（0 = 没在跑）。
+     * 用途：App 被闹钟在后台叫醒、页面没起过倒计时，回到前台时用来接着显示。
+     */
+    @JavascriptInterface
+    public int getWalkRemainingSec() {
+        try {
+            return WalkTimerService.remainingSec();
+        } catch (Throwable t) {
+            return 0;
+        }
     }
 
     @JavascriptInterface

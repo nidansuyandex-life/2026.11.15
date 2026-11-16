@@ -32,16 +32,16 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
-    # —— 安装 Android SDK ——
-    # ubuntu-latest runner 默认没有 Android SDK，必须显式安装，否则
-    # assembleDebug/assembleRelease 会因找不到 SDK（compileSdk 34 / build-tools）而失败。
+    # ubuntu-latest 自带 Android SDK。这里让 setup-android 一次性装好
+    # platform-34 / build-tools 34，并静默接受许可：
+    #   - packages：自动安装所需 SDK 包（免去单独 sdkmanager 步骤）
+    #   - log-accepted-android-sdk-licenses: false：不再逐条打印许可协议全文，
+    #     避免日志被 7 大段协议刷屏、看起来像卡住。
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
-
-    - name: Install SDK packages & accept licenses
-      run: |
-        yes | sdkmanager --licenses || true
-        sdkmanager "platforms;android-34" "build-tools;34.0.0"
+      with:
+        packages: 'platforms;android-34 build-tools;34.0.0'
+        log-accepted-android-sdk-licenses: false
 
     - name: Grant execute permission
       run: chmod +x ./gradlew

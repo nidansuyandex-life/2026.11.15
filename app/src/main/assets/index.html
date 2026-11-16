@@ -1638,6 +1638,22 @@ function getYesterdayBody(){ const h = getBodyHistory(); const today = todayStr(
 function getProductLibrary(){ const v = HealthStore.load('productLibrary', []); return Array.isArray(v) ? v : []; } function saveProductLibrary(v){ HealthStore.save('productLibrary', v); }
 function productDaysLeft(p){ const now = new Date(); now.setHours(0,0,0,0); if (p.openedDate){ if (!p.shelfLifeMonths) return null; const d = new Date(p.openedDate+'T00:00:00'); d.setMonth(d.getMonth() + Number(p.shelfLifeMonths)); return Math.ceil((d - now) / 86400000); } else if (p.expiryDate){ return Math.ceil((new Date(p.expiryDate+'T00:00:00') - now) / 86400000); } return null; }
 function isProductExpired(p){ const left = productDaysLeft(p); return left !== null && left <= 0; }
+/* P58：库存口径迁移 —— 统一成「未开封整瓶数」。
+   旧版留空默认 1，已开封产品的这个 1 基本是假数据，归零（需要的话卡片上点 ＋ 补回）；
+   未填 / null 一律归 0。只跑一次。 */
+function migrateProductStockV2(){
+  if (LS.get('app_h_prodStockV2', 0)) return;
+  const lib = getProductLibrary();
+  let changed = false;
+  lib.forEach(function(p){
+    if (!p || typeof p !== 'object') return;
+    const raw = (p.stock === null || p.stock === undefined || p.stock === '') ? 0 : Math.max(0, Math.floor(Number(p.stock) || 0));
+    const next = (p.openedDate && raw === 1) ? 0 : raw;
+    if (p.stock !== next){ p.stock = next; changed = true; }
+  });
+  if (changed) saveProductLibrary(lib);
+  LS.set('app_h_prodStockV2', 1);
+}
 function migrateOldSkinProducts(){ const old = HealthStore.load('skinProducts', null); if (old && typeof old === 'object' && Object.keys(old).length){ const lib = getProductLibrary(); if (lib.length === 0){ const today = todayStr(); Object.values(old).forEach(p => { if (p && p.name){ lib.push({ id:'p_migrated_'+Date.now()+'_'+Math.random().toString(36).slice(2,7), name:p.name, majorCat:'other', openedDate:today, shelfLifeMonths:12, expiryDate:null, ingredients:p.ingredients||'', createdAt:Date.now() }); } }); saveProductLibrary(lib); HealthStore.del('skinProducts'); } } }
 function getAIRoutine(dateStr){ const v = HealthStore.load('aiRoutine_'+dateStr, null); return v && typeof v === 'object' ? v : null; } function saveAIRoutine(dateStr, r){ HealthStore.save('aiRoutine_'+dateStr, r); } function clearAIRoutine(dateStr){ HealthStore.del('aiRoutine_'+dateStr); }
 function generateRoutineRaw(dateStr, skinKey){ const d = new Date((dateStr||todayStr())+'T00:00:00'); const dayN = Math.floor(d.getTime() / 86400000); const dayOfWeek = d.getDay(); const lib = getProductLibrary(); const opened = lib.filter(p => p.openedDate && !isProductExpired(p)); if (!opened.length) return { empty:true, morning:[], night:[] }; const byMajor = {}; opened.forEach(p => { const m = p.majorCat || 'other'; if (!byMajor[m]) byMajor[m] = []; byMajor[m].push(p); }); const pickRot = (arr, offset) => { if (!arr || !arr.length) return null; const idx = ((dayN + (offset||0)) % arr.length + arr.length) % arr.length; return arr[idx]; }; const morning = []; const night = []; if (skinKey === 'severe'){ const cleanser = pickRot(byMajor.cleanser, 0); const toner = pickRot(byMajor.toner, 0); const serum = pickRot(byMajor.serum, 0); const cream = pickRot(byMajor.cream, 0) || pickRot(byMajor.lotion, 0); const spf = pickRot(byMajor.sunscreen, 0); const remover = pickRot(byMajor.makeupRemover, 0); const cleanserPm = pickRot(byMajor.cleanser, 1) || cleanser; const serumPm = pickRot(byMajor.serum, 1) || serum; const creamPm = pickRot(byMajor.cream, 1) || pickRot(byMajor.lotion, 1) || cream; if (cleanser) morning.push({ step:'洁面', product:cleanser, note:'清水或极温和' }); if (toner) morning.push({ step:'舒缓水', product:toner }); if (serum) morning.push({ step:'修复精华', product:serum, note:'舒缓修护' }); if (cream) morning.push({ step:'保湿霜', product:cream, note:'成分简单' }); if (spf) morning.push({ step:'防晒', product:spf, note:'物理防晒优先' }); if (remover) night.push({ step:'卸妆', product:remover }); if (cleanserPm) night.push({ step:'洁面', product:cleanserPm, note:'温和清洁' }); if (serumPm) night.push({ step:'修复精华', product:serumPm }); if (creamPm) night.push({ step:'保湿霜', product:creamPm }); return { morning, night, empty:false }; } if (skinKey === 'acne'){ const cleanser = pickRot(byMajor.cleanser, 0); const cleanserPm = pickRot(byMajor.cleanser, 1) || cleanser; const toner = pickRot(byMajor.toner, 0); const serumAm = pickRot(byMajor.serum, 0); const serumPm = pickRot(byMajor.serum, 1) || serumAm; const lotion = pickRot(byMajor.lotion, 0); const cream = pickRot(byMajor.cream, 0); const spf = pickRot(byMajor.sunscreen, 0); const remover = pickRot(byMajor.makeupRemover, 0); const mask = pickRot(byMajor.mask, 0); if (cleanser) morning.push({ step:'洁面', product:cleanser }); if (toner) morning.push({ step:'爽肤水', product:toner }); if (serumAm) morning.push({ step:'精华', product:serumAm, note:'避开痘痘破口' }); if (lotion) morning.push({ step:'乳液', product:lotion }); else if (cream) morning.push({ step:'面霜', product:cream }); if (spf) morning.push({ step:'防晒', product:spf }); if (remover) night.push({ step:'卸妆', product:remover }); if (cleanserPm) night.push({ step:'洁面', product:cleanserPm }); if (serumPm) night.push({ step:'精华', product:serumPm, note:'痘痘区域点涂' }); if (cream) night.push({ step:'面霜', product:cream }); if (dayOfWeek === 0 && mask) night.push({ step:'面膜（周护理）', product:mask, note:'痘痘区域避开' }); return { morning, night, empty:false }; } const cleanserAm = pickRot(byMajor.cleanser, 0); const cleanserPm = pickRot(byMajor.cleanser, 1) || cleanserAm; const tonerAm = pickRot(byMajor.toner, 0); const tonerPm = pickRot(byMajor.toner, 1) || tonerAm; const serumArr = byMajor.serum || []; const serumAm = pickRot(serumArr, 0); const serumPm = serumArr.length >= 2 ? pickRot(serumArr, 1) : serumAm; const lotionAm = pickRot(byMajor.lotion, 0); const creamAm = pickRot(byMajor.cream, 0); const lotionPm = pickRot(byMajor.lotion, 1) || lotionAm; const creamPm = pickRot(byMajor.cream, 1) || creamAm; const spf = pickRot(byMajor.sunscreen, 0); const remover = pickRot(byMajor.makeupRemover, 0); const maskArr = byMajor.mask || []; const exfArr = byMajor.exfoliant || []; if (cleanserAm) morning.push({ step:'洁面', product:cleanserAm }); if (tonerAm) morning.push({ step:'爽肤水', product:tonerAm }); if (serumAm) morning.push({ step:'精华', product:serumAm }); if (lotionAm) morning.push({ step:'乳液', product:lotionAm }); else if (creamAm) morning.push({ step:'面霜', product:creamAm }); if (spf) morning.push({ step:'防晒', product:spf }); if (remover) night.push({ step:'卸妆', product:remover }); if (cleanserPm) night.push({ step:'洁面', product:cleanserPm }); if (tonerPm) night.push({ step:'爽肤水', product:tonerPm }); const isSaturday = dayOfWeek === 6; const isMaskDay = dayOfWeek === 3 || dayOfWeek === 0; if (isSaturday && exfArr.length){ const exf = pickRot(exfArr, 0); if (exf) night.push({ step:'去角质', product:exf, note:'每周1次，之后充分保湿' }); } else if (isMaskDay && maskArr.length){ const mask = pickRot(maskArr, 0); if (mask) night.push({ step:'面膜', product:mask, note:'面膜后正常护肤' }); } if (serumPm) night.push({ step:'精华', product:serumPm }); if (lotionPm) night.push({ step:'乳液', product:lotionPm }); else if (creamPm) night.push({ step:'面霜', product:creamPm }); return { morning, night, empty:false }; }
@@ -3916,7 +3932,28 @@ function closetAddPane(){
 function closetLibPane(){ const counts = Object.keys(CATEGORIES).map(k => ({ k, label:CATEGORIES[k].label, count: clothes.filter(c => c.cat === k).length })); let listHtml = ''; if (clothes.length) { listHtml = `<div class="lib-grid">${clothes.map(c => { const meta = CATEGORIES[c.cat]; let thumbHtml = `<span class="placeholder">${meta.icon}</span>`; if (c.imagePath){ const src = readImageFromNative(c.imagePath); if (src) thumbHtml = `<img src="${src}" style="max-width:100%;max-height:100%;object-fit:contain">`; } else if (c.image){ thumbHtml = `<img src="${c.image}" style="max-width:100%;max-height:100%;object-fit:contain">`; } return `<div class="lib-item"><button class="del" data-act="delCloth" data-id="${c.id}">✕</button><div class="thumb">${thumbHtml}</div><div class="n">${esc(c.name||meta.label)}</div><div class="s">${meta.label} · ${esc(c.size||'均码')}</div></div>`; }).join('')}</div>`; } else { listHtml = `<div class="empty-state" style="margin-top:16px;"><div class="es-icon">👗</div><div class="es-title">衣橱空空的</div><div class="es-desc">添加你的第一件衣服，系统会帮你<br>计算版型适配度。</div></div>`; } return `<div class="card"><div style="font-size:13px;font-weight:700;margin-bottom:10px;">我的产品库 <span class="muted" style="color:var(--sub);font-size:12.5px">${clothes.length} 件</span></div><div class="cat-tabs">${counts.map(c => `<button class="cat-tab">${c.label} ${c.count}</button>`).join('')}</div>${listHtml}</div>`; }
 function closetFreePane(){ const slots = ['上装','下装','鞋/包/饰品']; const slotHTML = slots.map((label, i) => `<div style="border:2px dashed #D9DEEA;border-radius:16px;padding:16px;text-align:center;color:#2F4359;font-size:12px;background:#fff;margin-bottom:10px;"><span style="font-size:26px;display:block;margin-bottom:6px">＋</span>点击选择${label}</div>`).join(''); return `<div class="card"><div style="font-size:13px;font-weight:700;margin-bottom:10px;">搭配台</div>${slotHTML}</div>`; }
 function careSection(){ let sub = state.careSub || 'skin'; if (sub === 'ingredient' || sub === 'productLib' || sub === 'suppLib'){ sub = 'skin'; state.careSub = 'skin'; } const subs = [{ id:'skin', label:'护肤推荐' },{ id:'supp', label:'补剂' }]; let content = ''; if (sub === 'skin') content = skinExpireAlert() + careSkinPane(); else content = careSuppPane(); return `<div class="subtabs-secondary">${subs.map(s => `<button class="subtab ${s.id===sub?'on':''}" data-act="careSub" data-sub="${s.id}">${s.label}</button>`).join('')}</div>${content}`; }
-function renderProductCard(p){ const days = productDaysLeft(p); const expired = isProductExpired(p); const cat = PRODUCT_CATS[p.majorCat] || PRODUCT_CATS.other; /* 库存：null/未填 = 没记过，不显示数字而显示「—」；0 = 已用完，卡片上直接标红 */ const stockNum = (p.stock === null || p.stock === undefined || p.stock === '') ? null : Math.max(0, Math.floor(Number(p.stock) || 0)); const stockBadge = stockNum === null ? '' : (stockNum > 0 ? '<span class="plc-badge" style="background:#EAF7F1;color:#1F6B53;">📦 库存 ' + stockNum + '</span>' : '<span class="plc-badge danger" style="background:#FFECEC;color:#B4453F;">📦 已用完</span>'); let daysBadge = ''; if (days !== null){ if (days < 0) daysBadge = '<span class="plc-badge danger">已过期</span>'; else if (days <= 7) daysBadge = '<span class="plc-badge danger">剩 ' + days + ' 天</span>'; else if (days <= 30) daysBadge = '<span class="plc-badge warn">剩 ' + days + ' 天</span>'; else daysBadge = '<span class="plc-badge ok">剩 ' + days + ' 天</span>'; } const openedBadge = p.openedDate ? ('<span class="plc-badge info">开封 '+p.openedDate+'</span>') : '<span class="plc-badge info">未开封</span>'; return `<div class="prod-lib-card ${expired?'expired':''}"><button class="plc-del" data-act="delProduct" data-id="${p.id}">✕</button><div class="plc-head"><div class="plc-icon">${cat.icon}</div><div class="plc-body"><div class="plc-name">${esc(p.name)}</div><div class="plc-meta">${esc(cat.label)}</div><div style="margin-top:6px;">${openedBadge}${daysBadge}${stockBadge}</div><div style="display:flex;align-items:center;gap:6px;margin-top:9px;"><span style="font-size:11.5px;color:var(--sub);">库存</span><button data-act="prodStockStep" data-id="${esc(p.id)}" data-step="-1" title="用掉一件" style="width:27px;height:27px;padding:0;border-radius:9px;border:1px solid #E6EEF9;background:#F7FAFF;font:inherit;font-size:15px;font-weight:800;line-height:1;color:#121C2A;">－</button><b style="min-width:26px;text-align:center;font-size:13.5px;color:${stockNum === 0 ? '#B4453F' : '#121C2A'};">${stockNum === null ? '—' : stockNum}</b><button data-act="prodStockStep" data-id="${esc(p.id)}" data-step="1" title="补一件（囤货）" style="width:27px;height:27px;padding:0;border-radius:9px;border:1px solid #E6EEF9;background:#F7FAFF;font:inherit;font-size:15px;font-weight:800;line-height:1;color:#121C2A;">＋</button><span style="font-size:11px;color:var(--sub);">件${stockNum === null ? ' · 还没记库存，点 ＋ 开始' : ''}</span></div>${p.ingredients ? `<div style="font-size:12px;color:var(--sub);margin-top:6px;line-height:1.55;">成分：${esc(p.ingredients).slice(0,70)}${p.ingredients.length>70?'…':''}</div>` : ''}${p.alwaysOn ? '<span class="plc-badge ok" style="margin-left:4px;">⚡ 直接安排</span>' : ''}${p.openedDate ? `<div style="text-align:right;margin-top:7px;"><button class="link-btn" data-act="toggleProdAlwaysOn" data-id="${esc(p.id)}" style="font-size:12px;color:${p.alwaysOn?'#1F6B53':'var(--ink)'};">${p.alwaysOn?'⚡ 已「直接安排」· 点此关闭':'⚡ 设为「直接安排」'}</button></div>` : ''}</div></div></div>`; }
+function renderProductCard(p){
+  const days = productDaysLeft(p);
+  const expired = isProductExpired(p);
+  const cat = PRODUCT_CATS[p.majorCat] || PRODUCT_CATS.other;
+  /* P58：库存只有一个口径 —— 还没拆封的整瓶数；正在用的那瓶不计入，默认 0 */
+  const spare = Math.max(0, Math.floor(Number(p.stock) || 0));
+  let daysBadge = '';
+  if (days !== null){
+    if (days < 0) daysBadge = '<span class="plc-badge danger">已过期</span>';
+    else if (days <= 7) daysBadge = '<span class="plc-badge danger">剩 ' + days + ' 天</span>';
+    else if (days <= 30) daysBadge = '<span class="plc-badge warn">剩 ' + days + ' 天</span>';
+    else daysBadge = '<span class="plc-badge ok">剩 ' + days + ' 天</span>';
+  }
+  /* 只用一处说明状态，避免「未开封」在卡上出现两次 */
+  const statusLine = p.openedDate
+    ? '<span class="plc-badge info">🧴 使用中 · ' + esc(p.openedDate.slice(5)) + ' 开封</span>' + daysBadge
+    : (daysBadge || '<span class="plc-badge info">📦 未开封</span>');
+  const spareLabel = p.openedDate ? '📦 另有未开封' : '📦 未开封';
+  const spareNote = spare > 0 ? '瓶' : (p.openedDate ? '瓶 · 没有囤货' : '瓶 · 点 ＋ 记上');
+  const stepBtn = 'width:27px;height:27px;padding:0;border-radius:9px;border:1px solid #E6EEF9;background:#F7FAFF;font:inherit;font-size:15px;font-weight:800;line-height:1;color:#121C2A;';
+  return `<div class="prod-lib-card ${expired?'expired':''}"><button class="plc-del" data-act="delProduct" data-id="${p.id}">✕</button><div class="plc-head"><div class="plc-icon">${cat.icon}</div><div class="plc-body"><div class="plc-name">${esc(p.name)}</div><div class="plc-meta">${esc(cat.label)}</div><div style="margin-top:6px;">${statusLine}</div><div style="display:flex;align-items:center;gap:6px;margin-top:9px;flex-wrap:wrap;"><span style="font-size:11.5px;color:var(--sub);font-weight:650;">${spareLabel}</span><button data-act="prodStockStep" data-id="${esc(p.id)}" data-step="-1" title="少记一瓶（送人 / 记错了）" style="${stepBtn}">－</button><b style="min-width:26px;text-align:center;font-size:13.5px;color:${spare === 0 ? 'var(--sub)' : '#121C2A'};">${spare}</b><button data-act="prodStockStep" data-id="${esc(p.id)}" data-step="1" title="又囤了一瓶" style="${stepBtn}">＋</button><span style="font-size:11px;color:var(--sub);">${spareNote}</span></div>${p.openedDate && spare > 0 ? `<div style="text-align:right;margin-top:6px;"><button class="link-btn" data-act="markProductOpened" data-id="${esc(p.id)}" style="font-size:12px;color:var(--ink);">✓ 这瓶用完了，开下一瓶</button></div>` : ''}${p.ingredients ? `<div style="font-size:12px;color:var(--sub);margin-top:6px;line-height:1.55;">成分：${esc(p.ingredients).slice(0,70)}${p.ingredients.length>70?'…':''}</div>` : ''}${p.alwaysOn ? '<span class="plc-badge ok" style="margin-left:4px;">⚡ 直接安排</span>' : ''}${p.openedDate ? `<div style="text-align:right;margin-top:7px;"><button class="link-btn" data-act="toggleProdAlwaysOn" data-id="${esc(p.id)}" style="font-size:12px;color:${p.alwaysOn?'#1F6B53':'var(--ink)'};">${p.alwaysOn?'⚡ 已「直接安排」· 点此关闭':'⚡ 设为「直接安排」'}</button></div>` : ''}</div></div></div>`;
+}
 /* ===== 库存单：药品 + 护肤产品（产品库）+ 补剂库，统一管效期 / 库存 ===== */
 function inventorySection(){ let sub = state.inventorySub || 'medicine'; if (sub !== 'medicine' && sub !== 'product' && sub !== 'supp'){ sub = 'medicine'; state.inventorySub = 'medicine'; } const subs = [{ id:'medicine', label:'药品' },{ id:'product', label:'护肤产品' },{ id:'supp', label:'补剂库' }]; let content = ''; if (sub === 'medicine') content = medicineSection(); else if (sub === 'product') content = careProductLibPane(); else content = careSuppLibPane(); return `<div class="subtabs-secondary">${subs.map(s => `<button class="subtab ${s.id===sub?'on':''}" data-act="inventorySub" data-sub="${s.id}">${s.label}</button>`).join('')}</div>${content}`; }
 function careProductLibPane(){
@@ -3924,9 +3961,8 @@ function careProductLibPane(){
   const opened = lib.filter(function(p){ return !!p.openedDate; });
   const unopened = lib.filter(function(p){ return !p.openedDate; });
   const expiredCount = lib.filter(isProductExpired).length;
-  /* 囤货合计：只累加「记过库存」的产品，未记录的单独计数，不虚增件数 */
-  const stockSum = lib.reduce(function(s, p){ const v = (p.stock === null || p.stock === undefined || p.stock === '') ? null : Math.max(0, Math.floor(Number(p.stock) || 0)); return s + (v === null ? 0 : v); }, 0);
-  const stockMissing = lib.filter(function(p){ return p.stock === null || p.stock === undefined || p.stock === ''; }).length;
+  /* 未开封囤货合计：只数还没拆的整瓶，正在用的那瓶不算 */
+  const spareSum = lib.reduce(function(s, p){ return s + Math.max(0, Math.floor(Number(p.stock) || 0)); }, 0);
   const filter = ['all','opened','unopened'].indexOf(state.prodLibFilter) >= 0 ? state.prodLibFilter : 'all';
   const majorOptions = Object.entries(PRODUCT_CATS).map(([key, cat]) => `<option value="${key}">${cat.icon} ${cat.label}</option>`).join('');
   const catOrder = k => { const c = PRODUCT_CATS[k]; return (c && c.order !== undefined) ? c.order : 99; };
@@ -3938,7 +3974,7 @@ function careProductLibPane(){
         <span style="font-size:11.5px;color:var(--sub);">${isOpened?'开封后计时':'未开封保质期'}</span>
       </div>
       <div style="font-size:11.5px;color:var(--sub);line-height:1.6;margin-bottom:9px;">${tip}</div>
-      ${sorted.length ? sorted.map(p => renderProductCard(p) + (isOpened ? '' : `<div style="text-align:right;margin:-6px 2px 12px;"><button class="link-btn" data-act="markProductOpened" data-id="${esc(p.id)}" style="font-size:12px;color:var(--ink);">✓ 今天开封了</button></div>`)).join('') : '<p class="tip" style="color:#2F4359;text-align:center;padding:12px 0;background:#E9F4FF;border-radius:10px;">这一组还没有产品</p>'}
+      ${sorted.length ? sorted.map(p => renderProductCard(p) + (isOpened ? '' : `<div style="text-align:right;margin:-6px 2px 12px;"><button class="link-btn" data-act="markProductOpened" data-id="${esc(p.id)}" style="font-size:12px;color:var(--ink);">✓ 今天开封了（囤货 -1）</button></div>`)).join('') : '<p class="tip" style="color:#2F4359;text-align:center;padding:12px 0;background:#E9F4FF;border-radius:10px;">这一组还没有产品</p>'}
     </div>`;
   };
   const chip = (key, label, icon, count) => {
@@ -3955,18 +3991,18 @@ function careProductLibPane(){
         ${chip('opened','已开封','🧴',opened.length)}
         ${chip('unopened','未开封','📦',unopened.length)}
       </div>
-      <div style="font-size:12.5px;opacity:.94;line-height:1.7;">共 ${lib.length} 件${expiredCount > 0 ? ' · ⚠️ '+expiredCount+' 件已过期，建议清理' : ' · 状态正常'}${lib.length ? ' · 库存合计 ' + stockSum + ' 件' + (stockMissing ? '（'+stockMissing+' 件未记库存）' : '') : ''}${filter !== 'all' ? ' · 当前只显示'+(filter==='opened'?'已开封':'未开封') : ''}</div>
+      <div style="font-size:12.5px;opacity:.94;line-height:1.7;">共 ${lib.length} 件${expiredCount > 0 ? ' · ⚠️ '+expiredCount+' 件已过期，建议清理' : ' · 状态正常'}${lib.length ? ' · 📦 未开封囤货合计 ' + spareSum + ' 瓶' : ''}${filter !== 'all' ? ' · 当前只显示'+(filter==='opened'?'已开封':'未开封') : ''}</div>
     </div>
     <div class="card"><div style="font-size:13px;font-weight:700;margin-bottom:10px;">添加产品</div>
       <div style="display:flex;gap:8px;margin-bottom:10px;"><button class="btn primary" id="prodPhotoBtn" data-act="prodPhotoPick" style="flex:1;">🖼 从相册选图识别</button><button class="btn" id="prodCameraBtn" data-act="prodCameraPick" style="flex:1;background:#E9F4FF;color:#121C2A;">📷 拍照识别</button><input type="file" id="prodPhoto" accept="image/*" style="display:none"><input type="file" id="prodCamera" accept="image/*" capture="environment" style="display:none"></div>
       <div id="prodPhotoStatus" style="display:none;font-size:12px;line-height:1.65;padding:9px 11px;border-radius:9px;margin-bottom:10px;background:#E9F4FF;color:#121C2A;word-break:break-all;"></div>
       <div id="prodPhotoPreviewWrap" style="display:none;margin-bottom:10px;text-align:center;"><img id="prodPhotoPreview" alt="已选中的照片" style="max-width:100%;max-height:190px;border-radius:12px;border:1px solid #E6EEF9;"><div style="font-size:11px;color:var(--sub);margin-top:4px;">↑ 已选中的照片</div></div>
       <p class="tip" style="font-size:11.5px;color:var(--sub);margin:0 0 10px;line-height:1.6;">拍瓶身正面用「📷 拍照识别」，已有照片用「🖼 从相册选图识别」；AI 会填好名称、大类、<b>成分</b>和开封后可用月数。成分按「照片成分表 → <b>联网检索该产品的公开成分表</b> → 实在查不到才按产品名推断」的顺序获取，来源标在成分框下方。想最准就拍瓶身背面的成分表特写。联网检索约多花 10–40 秒：智谱 / 通义千问直接可用，豆包需先在方舟控制台开通「豆包搜索 Custom 版」，DeepSeek 不支持联网。</p>
-      <div class="dim-row"><span class="lb">名称</span><input type="text" id="prodName" placeholder="如 OLAY 大红瓶" style="width:200px;text-align:left"></div><div class="dim-row"><span class="lb">大类</span><select id="prodMajorCat" style="width:200px;text-align:left;font-weight:600;">${majorOptions}</select></div><div class="dim-row"><span class="lb">开封时间</span><input type="date" id="prodOpened" style="width:200px"></div><div class="dim-row"><span class="lb">开封后可用月数</span><input type="number" id="prodShelfLife" placeholder="如 6" min="1" max="60" style="width:100px"><span class="unit">个月</span></div><div class="dim-row"><span class="lb">未开封到期日</span><input type="date" id="prodExpiry" style="width:200px"></div><div class="dim-row"><span class="lb">库存（囤货）</span><input type="number" id="prodStock" min="0" max="99" step="1" inputmode="numeric" placeholder="1" style="width:100px;text-align:center;"><span class="unit">件</span></div><div class="dim-row"><span class="lb">直接安排</span><label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#121C2A;cursor:pointer;"><input type="checkbox" id="prodAlwaysOn" style="width:18px;height:18px;"> 每周固定排进流程（已开封产品不漏用）</label></div><div class="dim-row" style="align-items:flex-start;padding-top:10px;"><span class="lb" style="margin-top:8px;">成分</span><textarea id="prodIngredients" placeholder="粘贴成分表（可选，AI 会参考它判断产品用途）" style="flex:1;border:1.5px solid #E6EEF9;border-radius:10px;padding:8px 10px;font-family:inherit;font-size:13px;min-height:60px;resize:vertical;"></textarea></div><div id="prodIngredientsFrom" style="display:none;margin:6px 0 0 70px;font-size:11.5px;line-height:1.55;padding:7px 9px;border-radius:8px;background:#E9F4FF;color:#121C2A;"></div><p class="tip" style="margin-top:8px;font-size:12.5px;color:var(--sub);">填写「开封时间 + 开封后可用月数」会自动倒计时；未开封可只填到期日。具体放在护肤流程哪一步，由 AI 根据产品名和成分判断。</p><button class="btn-primary" data-act="addProduct" style="margin-top:12px;background:linear-gradient(135deg,var(--pink),var(--pink2))">＋ 添加到产品库</button></div>
+      <div class="dim-row"><span class="lb">名称</span><input type="text" id="prodName" placeholder="如 OLAY 大红瓶" style="width:200px;text-align:left"></div><div class="dim-row"><span class="lb">大类</span><select id="prodMajorCat" style="width:200px;text-align:left;font-weight:600;">${majorOptions}</select></div><div class="dim-row"><span class="lb">开封时间</span><input type="date" id="prodOpened" style="width:200px"></div><div class="dim-row"><span class="lb">开封后可用月数</span><input type="number" id="prodShelfLife" placeholder="如 6" min="1" max="60" style="width:100px"><span class="unit">个月</span></div><div class="dim-row"><span class="lb">未开封到期日</span><input type="date" id="prodExpiry" style="width:200px"></div><div class="dim-row"><span class="lb">未开封囤货</span><input type="number" id="prodStock" min="0" max="99" step="1" inputmode="numeric" placeholder="0" style="width:100px;text-align:center;"><span class="unit">瓶</span></div><div class="dim-row"><span class="lb">直接安排</span><label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#121C2A;cursor:pointer;"><input type="checkbox" id="prodAlwaysOn" style="width:18px;height:18px;"> 每周固定排进流程（已开封产品不漏用）</label></div><div class="dim-row" style="align-items:flex-start;padding-top:10px;"><span class="lb" style="margin-top:8px;">成分</span><textarea id="prodIngredients" placeholder="粘贴成分表（可选，AI 会参考它判断产品用途）" style="flex:1;border:1.5px solid #E6EEF9;border-radius:10px;padding:8px 10px;font-family:inherit;font-size:13px;min-height:60px;resize:vertical;"></textarea></div><div id="prodIngredientsFrom" style="display:none;margin:6px 0 0 70px;font-size:11.5px;line-height:1.55;padding:7px 9px;border-radius:8px;background:#E9F4FF;color:#121C2A;"></div><p class="tip" style="margin-top:8px;font-size:12.5px;color:var(--sub);">填写「开封时间 + 开封后可用月数」会自动倒计时；未开封可只填到期日。<b>「未开封囤货」只数还没拆封的整瓶</b>，正在用的那瓶不算，留空就是 0。具体放在护肤流程哪一步，由 AI 根据产品名和成分判断。</p><button class="btn-primary" data-act="addProduct" style="margin-top:12px;background:linear-gradient(135deg,var(--pink),var(--pink2))">＋ 添加到产品库</button></div>
     <div class="card" id="prodListCard"><div class="row-between" style="margin-bottom:12px;"><div style="font-size:13px;font-weight:700;">${listTitle} <span class="muted" style="color:var(--sub);font-size:12.5px">${shownCount} 件</span></div>${filter !== 'all' ? '<button class="link-btn" data-act="setProdLibFilter" data-filter="all" style="font-size:12px;color:var(--ink);">显示全部</button>' : ''}</div>
-      ${showOpened ? group('已开封', '🧴', opened, true, '已填开封时间，按「开封后可用月数」倒计时。' + (expiredCount ? '⚠️ 有 '+expiredCount+' 件已过期。' : '')) : ''}
+      ${showOpened ? group('已开封', '🧴', opened, true, '正在用的那瓶：按「开封后可用月数」倒计时，不计入囤货。下面的「未开封囤货」是还没拆的备用瓶，这瓶用完点「开下一瓶」就会自动扣一瓶并重新计时。' + (expiredCount ? '⚠️ 有 '+expiredCount+' 件已过期。' : '')) : ''}
       ${showOpened && showUnopened ? '<div style="height:1px;background:#E9F4FF;margin:4px 0 14px;"></div>' : ''}
-      ${showUnopened ? group('未开封', '📦', unopened, false, '还没开封，按瓶身有效期管理。开封后点每张卡下面的「✓ 今天开封了」，就会移到「已开封」。') : ''}
+      ${showUnopened ? group('未开封', '📦', unopened, false, '还没拆封的整瓶，按瓶身有效期管理。点「✓ 今天开封了」会从囤货里拿走一瓶、移到「已开封」并开始倒计时。') : ''}
     </div>`;
 }
 
@@ -7247,7 +7283,18 @@ async function handleV3Action(act, t, e){
   if (act === 'markProductOpened'){
     const id = t.dataset.id, lib = getProductLibrary();
     const p = lib.find(x => x.id === id);
-    if (p){ p.openedDate = todayStr(); if (!p.shelfLifeMonths) p.shelfLifeMonths = 6; saveProductLibrary(lib); state.prodLibFilter = 'opened'; LS.set('app-prod-lib-filter','opened'); toast('✓ 已开封，已自动切到「已开封」列表'); render({ keepScroll:true }); }
+    if (p){
+      /* 开封 = 从囤货里拿走一瓶：未开封 -1，重新开始倒计时 */
+      const spare = Math.max(0, Math.floor(Number(p.stock) || 0));
+      const wasOpened = !!p.openedDate;
+      p.openedDate = todayStr();
+      if (!p.shelfLifeMonths) p.shelfLifeMonths = 6;
+      if (spare > 0) p.stock = spare - 1;
+      saveProductLibrary(lib);
+      state.prodLibFilter = 'opened'; LS.set('app-prod-lib-filter','opened');
+      toast(spare > 0 ? '✓ 已开封，未开封囤货剩 ' + p.stock + ' 瓶' : (wasOpened ? '✓ 已重新开封，今天开始计时' : '✓ 已开封，开始倒计时'));
+      render({ keepScroll:true });
+    }
     return true;
   }
   if (act === 'clearAISettings'){
@@ -7922,7 +7969,7 @@ if (act === 'clearExample'){
   if (act === 'openNews'){ openExternal(t.dataset.url); return; }
   if (act === 'openAI'){ openAIAssistant(); return; }
   if (act === 'openDownloadFolder'){ if (window.AndroidFile && typeof AndroidFile.openDownloadFolder === 'function'){ try { AndroidFile.openDownloadFolder(); } catch(e){ toast('打开失败，请手动打开「文件管理」'); } } else { toast('请手动打开「文件管理」APP →「下载」'); } return; }
-  if (act === 'closeCenterTimer'){ finishWalkTimer(); return; }
+  if (act === 'closeCenterTimer'){ finishWalkTimer(true); return; }
   if (act === 'startRest'){ startRestTimer(t.dataset.code, parseInt(t.dataset.sec, 10)); return; }
   if (act === 'gotoCloset'){ state.tab='life'; state.lifeSub='closet'; state.closetSub='add'; render(); return; }
   if (act === 'gotoBodyData'){ state.tab = 'life'; state.lifeSub = 'sport'; state.sportSub = 'body'; render(); return; }
@@ -8248,8 +8295,8 @@ if (act === 'clearExample'){
   if (act === 'saveBodyForm'){ let cnt = 0; document.querySelectorAll('[data-bkey]').forEach(input => { const k = input.dataset.bkey; const v = parseFloat(input.value); if (!isNaN(v)){ body[k] = v; cnt++; } }); HealthStore.save('body', body); const hist = getBodyHistory(); const idx = hist.findIndex(x => x.date === todayStr()); const entry = { date: todayStr(), weight: body.weight, bodyFat: body.bodyFat }; if (idx >= 0) hist[idx] = entry; else hist.push(entry); saveBodyHistory(hist); toast(`已保存 ${cnt} 项身材尺寸`); render({ keepScroll: true }); return; }
   if (act === 'saveCloth'){ const name = document.getElementById('clothName').value.trim(); const cat = document.getElementById('clothCat').value; const size = document.getElementById('clothSize').value.trim(); const color = document.getElementById('clothColor').value.trim(); const img = state.clothImage || null; let imagePath = null; if (img){ imagePath = saveImageToNative(img, 'cloth_' + Date.now() + '.jpg'); } const item = { id:Date.now()+Math.floor(Math.random()*1000), cat, name: name || CATEGORIES[cat].label, size: size || '均码', color, garment: { ...state.garmentDraft }, imagePath }; clothes.unshift(item); LS.set('app_h_clothes', clothes); state.clothImage = null; state.garmentDraft = {}; state.clothDraft = {}; toast('已保存'); render(); return; }
   if (act === 'delCloth'){ if (!confirm('删除这件单品？')) return; const id = Number(t.dataset.id); const item = clothes.find(c => c.id === id); if (item && item.imagePath) deleteImageNative(item.imagePath); clothes = clothes.filter(c => c.id !== id); LS.set('app_h_clothes', clothes); render(); return; }
-  if (act === 'addProduct'){ const name = (document.getElementById('prodName').value || '').trim(); const majorCat = document.getElementById('prodMajorCat').value; const openedDate = document.getElementById('prodOpened').value || null; const shelfLifeMonths = document.getElementById('prodShelfLife').value ? Number(document.getElementById('prodShelfLife').value) : null; const expiryDate = document.getElementById('prodExpiry').value || null; const ingredients = (document.getElementById('prodIngredients').value || '').trim(); const alwaysOn = document.getElementById('prodAlwaysOn') ? document.getElementById('prodAlwaysOn').checked : false; /* 库存留空=1 件（刚买的默认就有 1 件）；填了就是囤货总数，0 表示已用完 */ const stockEl = document.getElementById('prodStock'); const stockRaw = stockEl ? String(stockEl.value || '').trim() : ''; const stock = stockRaw === '' ? 1 : Math.max(0, Math.min(99, Math.floor(Number(stockRaw) || 0))); if (!name){ toast('请填写产品名称'); return; } if (!majorCat){ toast('请选择大类'); return; } if (!openedDate && !expiryDate){ toast('开封时间或未开封到期日至少填一个'); return; } const lib = getProductLibrary(); lib.push({ id:'p_'+Date.now()+'_'+Math.floor(Math.random()*1000), name, majorCat, openedDate, shelfLifeMonths, expiryDate, ingredients, stock, alwaysOn: !!alwaysOn, createdAt:Date.now() }); saveProductLibrary(lib); toast('✓ 已添加：' + name + '（库存 ' + stock + ' 件）'); render({ keepScroll: true }); return; }
-  if (act === 'prodStockStep'){ const id = t.dataset.id; const step = Number(t.dataset.step) || 0; if (!id || !step) return true; const lib = getProductLibrary(); const p = lib.find(x => x.id === id); if (!p) return true; const known = !(p.stock === null || p.stock === undefined || p.stock === ''); if (!known && step < 0){ toast('这件还没记库存，先点 ＋ 记上'); return true; } const cur = known ? Math.max(0, Math.floor(Number(p.stock) || 0)) : null; p.stock = Math.max(0, Math.min(99, (cur === null ? 1 : cur + step))); saveProductLibrary(lib); toast(step > 0 ? '已补货，库存 ' + p.stock + ' 件' : '已用掉一件，剩 ' + p.stock + ' 件' + (p.stock === 0 ? '，记得补货' : '')); render({keepScroll:true}); return true; }
+  if (act === 'addProduct'){ const name = (document.getElementById('prodName').value || '').trim(); const majorCat = document.getElementById('prodMajorCat').value; const openedDate = document.getElementById('prodOpened').value || null; const shelfLifeMonths = document.getElementById('prodShelfLife').value ? Number(document.getElementById('prodShelfLife').value) : null; const expiryDate = document.getElementById('prodExpiry').value || null; const ingredients = (document.getElementById('prodIngredients').value || '').trim(); const alwaysOn = document.getElementById('prodAlwaysOn') ? document.getElementById('prodAlwaysOn').checked : false; /* 未开封囤货：只数还没拆的整瓶，留空=0（正在用的那瓶不计入） */ const stockEl = document.getElementById('prodStock'); const stockRaw = stockEl ? String(stockEl.value || '').trim() : ''; const stock = stockRaw === '' ? 0 : Math.max(0, Math.min(99, Math.floor(Number(stockRaw) || 0))); if (!name){ toast('请填写产品名称'); return; } if (!majorCat){ toast('请选择大类'); return; } if (!openedDate && !expiryDate){ toast('开封时间或未开封到期日至少填一个'); return; } const lib = getProductLibrary(); lib.push({ id:'p_'+Date.now()+'_'+Math.floor(Math.random()*1000), name, majorCat, openedDate, shelfLifeMonths, expiryDate, ingredients, stock, alwaysOn: !!alwaysOn, createdAt:Date.now() }); saveProductLibrary(lib); toast('✓ 已添加：' + name + (stock > 0 ? '（未开封 ' + stock + ' 瓶）' : '')); render({ keepScroll: true }); return; }
+  if (act === 'prodStockStep'){ const id = t.dataset.id; const step = Number(t.dataset.step) || 0; if (!id || !step) return true; const lib = getProductLibrary(); const p = lib.find(x => x.id === id); if (!p) return true; /* 只加减「未开封的整瓶」，正在用的那瓶不参与 */ const cur = Math.max(0, Math.floor(Number(p.stock) || 0)); const next = Math.max(0, Math.min(99, cur + step)); if (next === cur){ toast(step < 0 ? '未开封囤货已经是 0 瓶了' : '最多记 99 瓶'); return true; } p.stock = next; saveProductLibrary(lib); toast(step > 0 ? '已记上囤货，未开封 ' + next + ' 瓶' : '未开封囤货改为 ' + next + ' 瓶'); render({keepScroll:true}); return true; }
   if (act === 'delProduct'){ const id = t.dataset.id; if (!id) return; if (!confirm('从产品库删除这件产品？')) return; const lib = getProductLibrary().filter(p => p.id !== id); saveProductLibrary(lib); toast('已删除'); render({ keepScroll: true }); return; }
   if (act === 'toggleProdAlwaysOn'){ const id = t.dataset.id; if (!id) return; const lib = getProductLibrary(); const p = lib.find(x => x.id === id); if (!p) return; p.alwaysOn = !p.alwaysOn; saveProductLibrary(lib); toast(p.alwaysOn ? '已设为「直接安排」✓' : '已关闭「直接安排」'); render({ keepScroll: true }); return; }
   if (act === 'aiRecommendRoutine'){ aiRecommendRoutine(); return; }
@@ -8727,44 +8774,83 @@ fab.addEventListener('click', () => {
 function requestNotifPermission(){ try { if (window.AndroidNotify && AndroidNotify.requestPermission) AndroidNotify.requestPermission(); if (typeof Notification !== 'undefined' && Notification.permission === 'default') Notification.requestPermission(); } catch(e){} }
 function sendNotification(title, body){ try { if (window.AndroidNotify && AndroidNotify.notify){ AndroidNotify.notify(title, body); return; } if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification(title, { body }); } catch(e){} }
 function vibratePattern(p){ try { if (navigator.vibrate) navigator.vibrate(p); } catch(e){} }
-function finishWalkTimer(){
+function walkHideCenterTimer(){
   const el = document.getElementById('centerTimer'); if (el) el.classList.remove('show');
   if (_walkCountdownHandle){ try { clearInterval(_walkCountdownHandle); } catch(e){} _walkCountdownHandle = null; }
   _walkEndTs = 0;
-  // 所有原生/媒体调用逐一兜底：微信抢音频焦点、通知权限被回收时最容易抛
+}
+function walkStartTicker(){
+  if (_walkCountdownHandle){ try { clearInterval(_walkCountdownHandle); } catch(e){} }
+  _walkCountdownHandle = setInterval(() => {
+    let left = 0;
+    try {
+      left = Math.max(0, Math.ceil((_walkEndTs - Date.now()) / 1000));
+      const num = document.getElementById('centerTimerNum');
+      if (num) num.textContent = left;
+    } catch(e){}
+    if (left <= 0) { try { finishWalkTimer(); } catch(e){} }
+  }, 250);
+}
+/* 原生服务还剩多少秒（0 = 没在跑）。后台被闹钟叫醒时页面没有自己的结束时刻，只能问原生 */
+function walkNativeRemainSec(){
+  try {
+    if (window.AndroidBridge && typeof AndroidBridge.getWalkRemainingSec === 'function'){
+      return Math.max(0, Number(AndroidBridge.getWalkRemainingSec()) || 0);
+    }
+  } catch(e){}
+  return 0;
+}
+function walkStopNative(){
   try { if (window.AndroidBridge && typeof AndroidBridge.stopNativeWalkTimer === 'function') AndroidBridge.stopNativeWalkTimer(); } catch(e){}
+}
+/* 到点只响一次：谁接管谁播报，另一个人只负责收尾
+   - byUser=true：用户点「知道了 / 关闭」→ 静默收起并停服务
+   - _walkNativeHandled：本次由原生服务计时，到点它会自己响，页面不重复播、也不 stopService（否则会掐断它的语音） */
+function finishWalkTimer(byUser){
+  const nativeHandled = _walkNativeHandled;
+  walkHideCenterTimer();
+  _walkNativeHandled = false;
+  if (byUser === true){ walkStopNative(); return; }
+  if (nativeHandled) return;
+  walkStopNative();   // 原生没接管：确保不留下幽灵结束闹钟
   try { playBeep(); setTimeout(() => { try { playBeep(); } catch(e){} }, 420); } catch(e){}
   try { vibratePattern([300, 150, 300]); } catch(e){}
   try { setTimeout(() => { try { speakText('时间到，回到座位继续吧'); } catch(e){} }, 600); } catch(e){}
   try { sendNotification('活动结束', '可以回到座位继续工作了'); } catch(e){}
 }
 let _walkEndTs = 0, _walkCountdownHandle = null, _walkTimerHandle = null;
+/* 本次倒计时是否已交给原生服务播报（决定到点时页面要不要自己响） */
+let _walkNativeHandled = false;
 
 
-function startWalkTimer(sec){ 
-  const el = document.getElementById('centerTimer'); 
-  const num = document.getElementById('centerTimerNum'); 
-  if (!el || !num) return; 
-  const duration = Math.max(1, parseInt(sec, 10) || 200); 
-  const wasRunning = !!_walkCountdownHandle;
-  _walkEndTs = Date.now() + duration * 1000; 
-  num.textContent = duration; 
-  el.classList.add('show'); 
-  
-  // ★ 只在「页面可见」且「尚未启动过原生服务」时同步给原生前台服务。
-  //   微信弹消息把 App 挤到后台后，Android 12+ 禁止后台启动前台服务，
-  //   JavaBridge 线程抛出的异常会直接杀掉整个进程（闪退）。
-  //   后台时由原生闹钟的通知负责提醒，不在这里起服务。
-  if (!wasRunning && document.visibilityState === 'visible') {
-    try { if (window.AndroidBridge && typeof AndroidBridge.startNativeWalkTimer === 'function') AndroidBridge.startNativeWalkTimer(duration); } catch(e){ console.warn('[Walk] 原生服务启动失败', e); }
+function startWalkTimer(sec, opts){
+  const el = document.getElementById('centerTimer');
+  const num = document.getElementById('centerTimerNum');
+  if (!el || !num) return;
+  const o = opts || {};
+  const silent = !!o.silent;
+  const duration = Math.max(1, parseInt(sec, 10) || 200);
+  const wasRunning = !!_walkCountdownHandle || _walkEndTs > 0;
+  _walkEndTs = Date.now() + duration * 1000;
+  num.textContent = duration;
+  el.classList.add('show');
+  walkStartTicker();
+
+  if (silent){
+    /* 回前台接续：原生已经在计时，这里只补上画面，不重播语音、不重复起服务 */
+    _walkNativeHandled = walkNativeRemainSec() > 0;
+    return;
   }
-  
-  if (_walkCountdownHandle) { try { clearInterval(_walkCountdownHandle); } catch(e){} }
-  _walkCountdownHandle = setInterval(() => { 
-    let left = 0;
-    try { left = Math.max(0, Math.ceil((_walkEndTs - Date.now()) / 1000)); num.textContent = left; } catch(e){}
-    if (left <= 0) { try { finishWalkTimer(); } catch(e){} }
-  }, 250); 
+
+  _walkNativeHandled = false;
+  if (!wasRunning && document.visibilityState === 'visible') {
+    try {
+      if (window.AndroidBridge && typeof AndroidBridge.startNativeWalkTimer === 'function'){
+        /* 返回 false = 原生没接管（后台启动被拒），到点由页面播报 */
+        _walkNativeHandled = (AndroidBridge.startNativeWalkTimer(duration) !== false);
+      }
+    } catch(e){ console.warn('[Walk] 原生服务启动失败', e); }
+  }
 
   // 语音 / 震动 / 通知全部包 try-catch（微信来消息时音频焦点与通知权限都可能变化）
   try { speakText('该站起来走动了，活动两到三分钟'); } catch(e){}
@@ -8772,26 +8858,27 @@ function startWalkTimer(sec){
   try { sendNotification('该站起来走动了', '起身活动 2–3 分钟，下巴轻收 5 次'); } catch(e){}
 }
 
-/** 从后台回到前台时校准倒计时：后台 WebView 可能被系统冻结，定时器不准 */
+/** 从后台回到前台时接续倒计时：后台 WebView 会被系统冻结，定时器不会照常走 */
 function resumeWalkTimerAfterForeground(){
   const el = document.getElementById('centerTimer');
-  if (!el || !el.classList.contains('show')) return;
-  if (!_walkEndTs || _walkEndTs <= 0) return;
-  const left = Math.max(0, Math.ceil((_walkEndTs - Date.now()) / 1000));
-  const num = document.getElementById('centerTimerNum'); if (num) num.textContent = left;
-  if (!_walkCountdownHandle){
-    _walkCountdownHandle = setInterval(() => {
-      const n = document.getElementById('centerTimerNum');
-      const l = Math.max(0, Math.ceil((_walkEndTs - Date.now()) / 1000));
-      if (n) n.textContent = l;
-      if (l <= 0) { try { finishWalkTimer(); } catch(e){} }
-    }, 250);
+  if (!el) return;
+
+  /* A. 页面自己正在显示倒计时：用绝对时间戳校准，必要时补回 ticker */
+  if (el.classList.contains('show') && _walkEndTs > 0){
+    const left = Math.max(0, Math.ceil((_walkEndTs - Date.now()) / 1000));
+    const num = document.getElementById('centerTimerNum'); if (num) num.textContent = left;
+    if (!_walkCountdownHandle) walkStartTicker();
+    if (left <= 0) { try { finishWalkTimer(); } catch(e){} }
+    return;
   }
-  if (left <= 0) { try { finishWalkTimer(); } catch(e){} }
+
+  /* B. 后台被闹钟叫醒、页面从没起过倒计时：原生还在跑就把剩余时间接着显示出来 */
+  const sec = walkNativeRemainSec();
+  if (sec > 0){ startWalkTimer(sec, { silent: true }); return; }
+
+  /* C. 只剩一个过期的空弹层：静默收起 */
+  if (el.classList.contains('show')){ walkHideCenterTimer(); _walkNativeHandled = false; }
 }
-
-
-
 let _currentSpeakBtn = null; let _speakSeq = 0; let _speakSceneTimer = null;
 
 function stopSpeak(){ 
@@ -9928,6 +10015,7 @@ function p55ExportErrLog(){
     try { window.__ensureAllData(); } catch(e){}
     p55NetEvaluate(false); // 启动时延迟确认在线状态，过滤 WebView 冷启动的假离线
     migrateOldSkinProducts(); 
+    try { migrateProductStockV2(); } catch(e){ console.warn('[库存] 迁移失败', e); }
     buildCalendarFromPlans(); 
     LearnStore.checkIn(); 
     restoreNavState(); 

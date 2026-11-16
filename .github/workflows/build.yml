@@ -79,8 +79,14 @@ jobs:
         echo "::error::无法恢复 gradle/wrapper/gradle-wrapper.jar，请手动上传该文件（约 45KB，位于 gradle/wrapper/ 下）"
         exit 1
 
-    - name: Grant execute permission
-      run: chmod +x ./gradlew
+    # Windows 上上传的 gradlew 常被存成 CRLF，shebang 变成 "#!/bin/sh\r"，
+    # 一执行就报 "./gradlew: /bin/sh^M: bad interpreter"（exit 126）。
+    # 这里无条件把行尾规整成 LF 再授权——不管仓库里那份是什么状态都能跑。
+    - name: Normalize gradlew + execute permission
+      run: |
+        sed -i 's/\r$//' ./gradlew
+        chmod +x ./gradlew
+        echo "shebang: $(head -1 ./gradlew)"
 
     - name: Verify assets (static regression)
       run: python3 ci/verify.py

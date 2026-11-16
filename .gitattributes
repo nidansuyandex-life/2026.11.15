@@ -1,0 +1,16 @@
+# 统一换行符。Windows 上保存/上传后 gradlew 很容易变成 CRLF，
+# shebang 就成了 "#!/bin/sh\r"，Linux CI 上直接报
+#   ./gradlew: /bin/sh^M: bad interpreter: No such file or directory (exit 126)
+# 所以这里强制 shell 脚本用 LF，批处理用 CRLF。
+* text=auto
+
+gradlew      text eol=lf
+gradlew.bat  text eol=crlf
+*.sh         text eol=lf
+*.bat        text eol=crlf
+
+# 二进制文件不要参与换行转换
+*.jar      binary
+*.keystore binary
+*.apk      binary
+*.aar      binary

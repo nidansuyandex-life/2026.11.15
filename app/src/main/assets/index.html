@@ -644,6 +644,52 @@ select,input[type=text],input[type=password]{width:100%;border:1.5px solid var(-
 .prod-lib-card .plc-badge.danger{background:var(--hot-soft);color:var(--ink);}
 .prod-lib-card .plc-badge.info{background:var(--blue-soft);color:var(--ink);}
 .prod-lib-card .plc-del{position:absolute;top:10px;right:10px;width:22px;height:22px;border-radius:50%;border:none;background:var(--hot-soft);color:var(--ink);font-size:12px;cursor:pointer;line-height:1;}
+/* P70：护肤产品库重排 —— 一行标题 / 一行状态 / 一行成分 / 一行小操作，卡片从 6 行压到 3–4 行 */
+.plc-stats{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
+.plc-stat{flex:1 1 0;min-width:0;display:flex;align-items:baseline;justify-content:space-between;gap:6px;font:inherit;cursor:pointer;background:#fff;border:1px solid var(--line);border-radius:12px;padding:7px 11px;color:var(--ink);-webkit-tap-highlight-color:transparent;}
+.plc-stat span{font-size:12px;color:var(--sub);font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.plc-stat b{font-size:18px;font-weight:800;line-height:1.05;}
+.plc-stat.on{background:var(--pink-soft);border-color:var(--pink);}
+.plc-stat.on span{color:var(--ink);}
+.plc-note{flex:0 0 auto;margin-left:auto;font-size:11.5px;color:var(--sub);white-space:nowrap;}
+.plc-note b{color:#C0392B;font-weight:750;}
+.card.plc-add{padding:13px 14px;}
+.plc-add-head{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;font:inherit;font-size:13.5px;font-weight:750;color:var(--ink);background:none;border:none;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.plc-add-arrow{font-size:11.5px;font-weight:600;color:var(--sub);}
+.plc-add-body{margin-top:12px;}
+.pf-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:2px;}
+.pf-cell{display:flex;flex-direction:column;gap:5px;min-width:0;}
+.pf-cell.wide{grid-column:1/-1;}
+.pf-cell>span{font-size:11.5px;color:var(--sub);font-weight:650;}
+.pf-cell input,.pf-cell select,.pf-cell textarea{width:100%;box-sizing:border-box;font-family:inherit;font-size:13.5px;font-weight:600;color:var(--ink);background:#fff;border:1.5px solid var(--line);border-radius:10px;padding:9px 10px;outline:none;}
+.pf-cell input[type=date]{font-size:13px;}
+.pf-cell textarea{min-height:58px;resize:vertical;font-weight:500;line-height:1.5;}
+.pf-check{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink);margin-top:12px;}
+.pf-check input{width:18px;height:18px;flex:0 0 auto;}
+.plc-group{margin-bottom:14px;}
+.plc-group:last-child{margin-bottom:0;}
+.plc-group-head{font-size:12.5px;font-weight:750;color:var(--ink);margin:0 2px 7px;}
+.plc-group-head b{font-weight:700;color:var(--sub);margin-left:2px;}
+.plc-list-head{display:flex;justify-content:flex-end;margin:-2px 0 6px;}
+.plc-empty{font-size:12.5px;color:var(--sub);text-align:center;padding:14px 0;}
+.plc-row1{display:flex;align-items:center;gap:8px;}
+.plc-ico{width:26px;height:26px;border-radius:8px;background:var(--pink-soft);display:grid;place-items:center;font-size:14px;flex:0 0 auto;}
+.plc-title{flex:1;min-width:0;font-size:14px;font-weight:700;color:var(--ink);line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.plc-row1 .plc-badge{flex:0 0 auto;margin:0;}
+.plc-row2{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;row-gap:4px;margin-top:5px;}
+.plc-sub{font-size:12px;color:var(--sub);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.plc-stock{display:flex;align-items:center;gap:5px;flex:0 0 auto;}
+.plc-stock-lb{font-size:11.5px;color:var(--sub);font-weight:650;}
+.plc-step{width:24px;height:24px;padding:0;border-radius:8px;border:1px solid var(--line);background:#F7FAFF;font:inherit;font-size:14px;font-weight:800;line-height:1;color:var(--ink);cursor:pointer;}
+.plc-num{min-width:18px;text-align:center;font-size:13px;font-weight:750;color:var(--ink);}
+.plc-num.zero{color:var(--sub);font-weight:600;}
+.plc-stock-unit{font-size:11px;color:var(--sub);}
+.plc-ings{margin-top:5px;font-size:11.5px;color:var(--sub);line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.plc-acts{margin-top:7px;display:flex;align-items:center;flex-wrap:wrap;gap:2px;}
+.plc-act{font:inherit;font-size:12px;font-weight:650;color:var(--ink);background:none;border:none;padding:2px 0;cursor:pointer;}
+.plc-act.on{color:#1F6B53;}
+.plc-act.del{color:var(--sub);font-weight:600;margin-left:auto;}
+.plc-acts i{font-style:normal;color:#D8DEE9;padding:0 6px;}
 /* --- 护肤流程 --- */
 .routine-step{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px dashed #E9F4FF;}
 .routine-step:last-child{border-bottom:none;}
@@ -2560,7 +2606,7 @@ const state = {
   restTimers: {}, exportRange: HealthStore.load('exportRange', 'month'), pendingTx: null, calendarData: {}, 
   profileDraft: { ...profile }, _pendingImport: null, showPastTodos: false, todoDraft: null, aiContext: null,
   passageData: null, passageLoading: false, clothImage: null, recShowAll: false, settingsSec: null,
-  prodLibFilter: LS.get('app-prod-lib-filter', 'all') || 'all', cognitionSub: 'general',
+  prodLibFilter: LS.get('app-prod-lib-filter', 'all') || 'all', prodAddOpen: false, cognitionSub: 'general',
   mimiSub: 'profile', medSearch: '', cmpBusy:false, cmpEdit:false, cmpGreetTried:{}, cmpDigesting:false, cmpShowCount:0, cmpSummarizing:false
 };
 const view = document.getElementById('view'); const tabbar = document.getElementById('tabbar'); const sheet = document.getElementById('sheet'); const fab = document.getElementById('fab');
@@ -4158,22 +4204,36 @@ function renderProductCard(p){
   const cat = PRODUCT_CATS[p.majorCat] || PRODUCT_CATS.other;
   /* P58：库存只有一个口径 —— 还没拆封的整瓶数；正在用的那瓶不计入，默认 0 */
   const spare = Math.max(0, Math.floor(Number(p.stock) || 0));
-  let daysBadge = '';
+  let badge = '';
   if (days !== null){
-    if (days < 0) daysBadge = '<span class="plc-badge danger">已过期</span>';
-    else if (days <= 7) daysBadge = '<span class="plc-badge danger">剩 ' + days + ' 天</span>';
-    else if (days <= 30) daysBadge = '<span class="plc-badge warn">剩 ' + days + ' 天</span>';
-    else daysBadge = '<span class="plc-badge ok">剩 ' + days + ' 天</span>';
+    if (days < 0) badge = '<span class="plc-badge danger">已过期</span>';
+    else if (days <= 7) badge = '<span class="plc-badge danger">剩 ' + days + ' 天</span>';
+    else if (days <= 30) badge = '<span class="plc-badge warn">剩 ' + days + ' 天</span>';
+    else badge = '<span class="plc-badge ok">剩 ' + days + ' 天</span>';
   }
-  /* 只用一处说明状态，避免「未开封」在卡上出现两次 */
-  const statusLine = p.openedDate
-    ? '<span class="plc-badge info">🧴 使用中 · ' + esc(p.openedDate.slice(5)) + ' 开封</span>' + daysBadge
-    : (daysBadge || '<span class="plc-badge info">📦 未开封</span>');
-  const spareLabel = p.openedDate ? '📦 另有未开封' : '📦 未开封';
+  /* 状态并成一行小字：品类 + 开封日 / 到期日，不再各占一行 */
+  const meta = p.openedDate
+    ? esc(cat.label) + ' · ' + esc(String(p.openedDate).slice(5)) + ' 开封'
+    : esc(cat.label) + (p.expiryDate ? ' · 到期 ' + esc(String(p.expiryDate).slice(2).replace(/-/g, '.')) : '');
+  const spareLabel = p.openedDate ? '另有未开封' : '囤货';
   const spareNote = spare > 0 ? '瓶' : (p.openedDate ? '瓶 · 没有囤货' : '瓶 · 点 ＋ 记上');
-  const stepBtn = 'width:27px;height:27px;padding:0;border-radius:9px;border:1px solid #E6EEF9;background:#F7FAFF;font:inherit;font-size:15px;font-weight:800;line-height:1;color:#121C2A;';
-  return `<div class="prod-lib-card ${expired?'expired':''}"><button class="plc-del" data-act="delProduct" data-id="${p.id}">✕</button><div class="plc-head"><div class="plc-icon">${cat.icon}</div><div class="plc-body"><div class="plc-name">${esc(p.name)}</div><div class="plc-meta">${esc(cat.label)}</div><div style="margin-top:6px;">${statusLine}</div><div style="display:flex;align-items:center;gap:6px;margin-top:9px;flex-wrap:wrap;"><span style="font-size:11.5px;color:var(--sub);font-weight:650;">${spareLabel}</span><button data-act="prodStockStep" data-id="${esc(p.id)}" data-step="-1" title="少记一瓶（送人 / 记错了）" style="${stepBtn}">－</button><b style="min-width:26px;text-align:center;font-size:13.5px;color:${spare === 0 ? 'var(--sub)' : '#121C2A'};">${spare}</b><button data-act="prodStockStep" data-id="${esc(p.id)}" data-step="1" title="又囤了一瓶" style="${stepBtn}">＋</button><span style="font-size:11px;color:var(--sub);">${spareNote}</span></div>${p.openedDate && spare > 0 ? `<div style="text-align:right;margin-top:6px;"><button class="link-btn" data-act="markProductOpened" data-id="${esc(p.id)}" style="font-size:12px;color:var(--ink);">✓ 这瓶用完了，开下一瓶</button></div>` : ''}${p.ingredients ? `<div style="font-size:12px;color:var(--sub);margin-top:6px;line-height:1.55;">成分：${esc(p.ingredients).slice(0,70)}${p.ingredients.length>70?'…':''}</div>` : ''}${p.alwaysOn ? '<span class="plc-badge ok" style="margin-left:4px;">⚡ 直接安排</span>' : ''}${p.openedDate ? `<div style="text-align:right;margin-top:7px;"><button class="link-btn" data-act="toggleProdAlwaysOn" data-id="${esc(p.id)}" style="font-size:12px;color:${p.alwaysOn?'#1F6B53':'var(--ink)'};">${p.alwaysOn?'⚡ 已「直接安排」· 点此关闭':'⚡ 设为「直接安排」'}</button></div>` : ''}</div></div></div>`;
+  const acts = [];
+  if (!p.openedDate) acts.push('<button class="plc-act" data-act="markProductOpened" data-id="' + esc(p.id) + '">今天开封</button>');
+  else if (spare > 0) acts.push('<button class="plc-act" data-act="markProductOpened" data-id="' + esc(p.id) + '">用完了，开下一瓶</button>');
+  if (p.openedDate) acts.push('<button class="plc-act' + (p.alwaysOn ? ' on' : '') + '" data-act="toggleProdAlwaysOn" data-id="' + esc(p.id) + '">' + (p.alwaysOn ? '⚡ 直接安排中' : '⚡ 直接安排') + '</button>');
+  return '<div class="prod-lib-card' + (expired ? ' expired' : '') + '">'
+    + '<div class="plc-row1"><span class="plc-ico">' + cat.icon + '</span><span class="plc-title">' + esc(p.name) + '</span>' + badge + '</div>'
+    + '<div class="plc-row2"><span class="plc-sub">' + meta + '</span>'
+    + '<span class="plc-stock"><span class="plc-stock-lb">' + spareLabel + '</span>'
+    + '<button class="plc-step" data-act="prodStockStep" data-id="' + esc(p.id) + '" data-step="-1" title="少记一瓶（送人 / 记错了）">－</button>'
+    + '<b class="plc-num' + (spare ? '' : ' zero') + '">' + spare + '</b>'
+    + '<button class="plc-step" data-act="prodStockStep" data-id="' + esc(p.id) + '" data-step="1" title="又囤了一瓶">＋</button>'
+    + '<span class="plc-stock-unit">' + spareNote + '</span></span></div>'
+    + (p.ingredients ? '<div class="plc-ings">成分：' + esc(p.ingredients) + '</div>' : '')
+    + '<div class="plc-acts">' + acts.join('<i>·</i>') + '<button class="plc-act del" data-act="delProduct" data-id="' + esc(p.id) + '">删除</button></div>'
+    + '</div>';
 }
+
 /* ===== 库存单：药品 + 护肤产品（产品库）+ 补剂库，统一管效期 / 库存 ===== */
 function inventorySection(){ let sub = state.inventorySub || 'medicine'; if (sub !== 'medicine' && sub !== 'product' && sub !== 'supp'){ sub = 'medicine'; state.inventorySub = 'medicine'; } const subs = [{ id:'medicine', label:'药品' },{ id:'product', label:'护肤产品' },{ id:'supp', label:'补剂库' }]; let content = ''; if (sub === 'medicine') content = medicineSection(); else if (sub === 'product') content = careProductLibPane(); else content = careSuppLibPane(); return `<div class="subtabs-secondary">${subs.map(s => `<button class="subtab ${s.id===sub?'on':''}" data-act="inventorySub" data-sub="${s.id}">${s.label}</button>`).join('')}</div>${content}`; }
 function careProductLibPane(){
@@ -4184,44 +4244,44 @@ function careProductLibPane(){
   /* 未开封囤货合计：只数还没拆的整瓶，正在用的那瓶不算 */
   const spareSum = lib.reduce(function(s, p){ return s + Math.max(0, Math.floor(Number(p.stock) || 0)); }, 0);
   const filter = ['all','opened','unopened'].indexOf(state.prodLibFilter) >= 0 ? state.prodLibFilter : 'all';
+  const addOpen = !!state.prodAddOpen;
   const majorOptions = Object.entries(PRODUCT_CATS).map(([key, cat]) => `<option value="${key}">${cat.icon} ${cat.label}</option>`).join('');
   const catOrder = k => { const c = PRODUCT_CATS[k]; return (c && c.order !== undefined) ? c.order : 99; };
-  const group = (title, icon, arr, isOpened, tip) => {
+  const group = (title, icon, arr) => {
+    if (!arr.length) return '';
     const sorted = arr.slice().sort((a,b) => (catOrder(a.majorCat) - catOrder(b.majorCat)) || ((a.createdAt||0) - (b.createdAt||0)));
-    return `<div style="margin-bottom:16px;">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;">
-        <span style="font-size:13.5px;font-weight:800;color:#121C2A;">${icon} ${title} <span style="color:var(--sub);font-weight:650;">${arr.length} 件</span></span>
-        <span style="font-size:11.5px;color:var(--sub);">${isOpened?'开封后计时':'未开封保质期'}</span>
-      </div>
-      ${tip ? `<div style="font-size:11.5px;color:var(--sub);line-height:1.6;margin-bottom:9px;">${tip}</div>` : ''}
-      ${sorted.length ? sorted.map(p => renderProductCard(p) + (isOpened ? '' : `<div style="text-align:right;margin:-6px 2px 12px;"><button class="link-btn" data-act="markProductOpened" data-id="${esc(p.id)}" style="font-size:12px;color:var(--ink);">✓ 今天开封了（囤货 -1）</button></div>`)).join('') : '<p class="tip" style="color:#2F4359;text-align:center;padding:12px 0;background:#E9F4FF;border-radius:10px;">这一组还没有产品</p>'}
-    </div>`;
+    return `<div class="plc-group"><div class="plc-group-head">${icon} ${title} <b>${arr.length}</b></div>${sorted.map(renderProductCard).join('')}</div>`;
   };
-  const chip = (key, label, icon, count) => {
-    const on = filter === key;
-    return `<button type="button" data-act="setProdLibFilter" data-filter="${key}" style="flex:1;cursor:pointer;text-align:left;font-family:inherit;border:2px solid ${on?'#fff':'rgba(255,255,255,.32)'};background:${on?'rgba(255,255,255,.36)':'rgba(255,255,255,.18)'};color:#fff;border-radius:12px;padding:9px 11px;-webkit-tap-highlight-color:transparent;"><div style="font-size:11.5px;opacity:.95;font-weight:650;">${icon} ${label}${on?' ✓':''}</div><div style="font-size:23px;font-weight:800;line-height:1.3;">${count}</div><div style="font-size:10.5px;opacity:.9;">${on?'再点一次 → 显示全部':'点我只显示'+label}</div></button>`;
-  };
+  const stat = (key, label, icon, count) => `<button type="button" class="plc-stat${filter === key ? ' on' : ''}" data-act="setProdLibFilter" data-filter="${key}"><span>${icon} ${label}</span><b>${count}</b></button>`;
   const showOpened = filter !== 'unopened';
   const showUnopened = filter !== 'opened';
-  const shownCount = filter === 'opened' ? opened.length : (filter === 'unopened' ? unopened.length : lib.length);
-  const listTitle = filter === 'opened' ? '已开封产品' : (filter === 'unopened' ? '未开封产品' : '产品列表（按开封状态分组）');
-  return `<div class="card" style="background:linear-gradient(135deg,var(--pink),var(--pink2));color:#fff;border:0;">
-      <div style="font-size:12px;letter-spacing:1.5px;font-weight:750;opacity:.75;margin-bottom:8px;">📦 我的产品库 <span style="font-weight:600;letter-spacing:0;opacity:.85;">· 点下面的数字筛选</span></div>
-      <div style="display:flex;gap:10px;margin-bottom:8px;">
-        ${chip('opened','已开封','🧴',opened.length)}
-        ${chip('unopened','未开封','📦',unopened.length)}
+  const hit = (showOpened ? opened.length : 0) + (showUnopened ? unopened.length : 0);
+  return `<div class="plc-stats">${stat('opened','在用','🧴',opened.length)}${stat('unopened','未开封','📦',unopened.length)}<span class="plc-note">囤货 ${spareSum} 瓶${expiredCount > 0 ? ' · <b>' + expiredCount + ' 过期</b>' : ''}</span></div>
+    <div class="card plc-add">
+      <button class="plc-add-head" data-act="toggleProdAdd"><span>＋ 添加产品</span><span class="plc-add-arrow">${addOpen ? '收起' : '展开'}</span></button>
+      <div class="plc-add-body"${addOpen ? '' : ' style="display:none"'}>
+        <div style="display:flex;gap:8px;margin-bottom:10px;"><button class="btn primary" id="prodPhotoBtn" data-act="prodPhotoPick" style="flex:1;">🖼 相册识别</button><button class="btn" id="prodCameraBtn" data-act="prodCameraPick" style="flex:1;background:var(--pink-soft);color:#121C2A;">📷 拍照识别</button><input type="file" id="prodPhoto" accept="image/*" style="display:none"><input type="file" id="prodCamera" accept="image/*" capture="environment" style="display:none"></div>
+        <div id="prodPhotoStatus" style="display:none;font-size:12px;line-height:1.65;padding:9px 11px;border-radius:9px;margin-bottom:10px;background:var(--pink-soft);color:#121C2A;word-break:break-all;"></div>
+        <div id="prodPhotoPreviewWrap" style="display:none;margin-bottom:10px;text-align:center;"><img id="prodPhotoPreview" alt="已选中的照片" style="max-width:100%;max-height:190px;border-radius:12px;border:1px solid var(--line);"></div>
+        <div class="pf-grid">
+          <div class="pf-cell wide"><span>名称</span><input type="text" id="prodName" placeholder="如 OLAY 大红瓶"></div>
+          <div class="pf-cell"><span>大类</span><select id="prodMajorCat">${majorOptions}</select></div>
+          <div class="pf-cell"><span>开封时间</span><input type="date" id="prodOpened"></div>
+          <div class="pf-cell"><span>开封后可用（月）</span><input type="number" id="prodShelfLife" placeholder="如 6" min="1" max="60"></div>
+          <div class="pf-cell"><span>囤货（瓶）</span><input type="number" id="prodStock" min="0" max="99" step="1" inputmode="numeric" placeholder="0"></div>
+          <div class="pf-cell wide"><span>未开封到期日</span><input type="date" id="prodExpiry"></div>
+          <div class="pf-cell wide"><span>成分</span><textarea id="prodIngredients" placeholder="可选，AI 会参考它判断产品用途"></textarea></div>
+        </div>
+        <div id="prodIngredientsFrom" style="display:none;margin:8px 0 0;font-size:11.5px;line-height:1.55;padding:7px 9px;border-radius:8px;background:var(--pink-soft);color:#121C2A;"></div>
+        <label class="pf-check"><input type="checkbox" id="prodAlwaysOn"> 每周固定排进流程（已开封的不漏用）</label>
+        <button class="btn-primary" data-act="addProduct" style="margin-top:12px;background:linear-gradient(135deg,var(--pink),var(--pink2))">＋ 添加到产品库</button>
       </div>
-      <div style="font-size:12.5px;opacity:.94;line-height:1.7;">共 ${lib.length} 件${expiredCount > 0 ? ' · ⚠️ '+expiredCount+' 件已过期，建议清理' : ' · 状态正常'}${lib.length ? ' · 📦 未开封囤货合计 ' + spareSum + ' 瓶' : ''}${filter !== 'all' ? ' · 当前只显示'+(filter==='opened'?'已开封':'未开封') : ''}</div>
     </div>
-    <div class="card"><div style="font-size:13px;font-weight:700;margin-bottom:10px;">添加产品</div>
-      <div style="display:flex;gap:8px;margin-bottom:10px;"><button class="btn primary" id="prodPhotoBtn" data-act="prodPhotoPick" style="flex:1;">🖼 从相册选图识别</button><button class="btn" id="prodCameraBtn" data-act="prodCameraPick" style="flex:1;background:#E9F4FF;color:#121C2A;">📷 拍照识别</button><input type="file" id="prodPhoto" accept="image/*" style="display:none"><input type="file" id="prodCamera" accept="image/*" capture="environment" style="display:none"></div>
-      <div id="prodPhotoStatus" style="display:none;font-size:12px;line-height:1.65;padding:9px 11px;border-radius:9px;margin-bottom:10px;background:#E9F4FF;color:#121C2A;word-break:break-all;"></div>
-      <div id="prodPhotoPreviewWrap" style="display:none;margin-bottom:10px;text-align:center;"><img id="prodPhotoPreview" alt="已选中的照片" style="max-width:100%;max-height:190px;border-radius:12px;border:1px solid #E6EEF9;"><div style="font-size:11px;color:var(--sub);margin-top:4px;">↑ 已选中的照片</div></div>
-      <div class="dim-row"><span class="lb">名称</span><input type="text" id="prodName" placeholder="如 OLAY 大红瓶" style="width:200px;text-align:left"></div><div class="dim-row"><span class="lb">大类</span><select id="prodMajorCat" style="width:200px;text-align:left;font-weight:600;">${majorOptions}</select></div><div class="dim-row"><span class="lb">开封时间</span><input type="date" id="prodOpened" style="width:200px"></div><div class="dim-row"><span class="lb">开封后可用月数</span><input type="number" id="prodShelfLife" placeholder="如 6" min="1" max="60" style="width:100px"><span class="unit">个月</span></div><div class="dim-row"><span class="lb">未开封到期日</span><input type="date" id="prodExpiry" style="width:200px"></div><div class="dim-row"><span class="lb">未开封囤货</span><input type="number" id="prodStock" min="0" max="99" step="1" inputmode="numeric" placeholder="0" style="width:100px;text-align:center;"><span class="unit">瓶</span></div><div class="dim-row"><span class="lb">直接安排</span><label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#121C2A;cursor:pointer;"><input type="checkbox" id="prodAlwaysOn" style="width:18px;height:18px;"> 每周固定排进流程（已开封产品不漏用）</label></div><div class="dim-row" style="align-items:flex-start;padding-top:10px;"><span class="lb" style="margin-top:8px;">成分</span><textarea id="prodIngredients" placeholder="粘贴成分表（可选，AI 会参考它判断产品用途）" style="flex:1;border:1.5px solid #E6EEF9;border-radius:10px;padding:8px 10px;font-family:inherit;font-size:13px;min-height:60px;resize:vertical;"></textarea></div><div id="prodIngredientsFrom" style="display:none;margin:6px 0 0 70px;font-size:11.5px;line-height:1.55;padding:7px 9px;border-radius:8px;background:#E9F4FF;color:#121C2A;"></div><button class="btn-primary" data-act="addProduct" style="margin-top:12px;background:linear-gradient(135deg,var(--pink),var(--pink2))">＋ 添加到产品库</button></div>
-    <div class="card" id="prodListCard"><div class="row-between" style="margin-bottom:12px;"><div style="font-size:13px;font-weight:700;">${listTitle} <span class="muted" style="color:var(--sub);font-size:12.5px">${shownCount} 件</span></div>${filter !== 'all' ? '<button class="link-btn" data-act="setProdLibFilter" data-filter="all" style="font-size:12px;color:var(--ink);">显示全部</button>' : ''}</div>
-      ${showOpened ? group('已开封', '🧴', opened, true, expiredCount ? '⚠️ 有 '+expiredCount+' 件已过期。' : '') : ''}
-      ${showOpened && showUnopened ? '<div style="height:1px;background:#E9F4FF;margin:4px 0 14px;"></div>' : ''}
-      ${showUnopened ? group('未开封', '📦', unopened, false, '') : ''}
+    <div class="card" id="prodListCard">
+      ${filter !== 'all' ? '<div class="plc-list-head"><button class="link-btn" data-act="setProdLibFilter" data-filter="all" style="font-size:12px;color:var(--ink);">显示全部</button></div>' : ''}
+      ${hit ? '' : '<div class="plc-empty">还没有产品 · 点上面的「＋ 添加产品」</div>'}
+      ${showOpened ? group('在用','🧴',opened) : ''}
+      ${showUnopened ? group('未开封','📦',unopened) : ''}
     </div>`;
 }
 
@@ -8974,6 +9034,7 @@ if (act === 'clearExample'){
     toast('已创建 ' + rows.length + ' 条语音待办'); render({ keepScroll: true }); return;
   }
   if (act === 'togglePastTodos'){ state.showPastTodos = !state.showPastTodos; render({ keepScroll: true }); return; }
+  if (act === 'toggleProdAdd'){ state.prodAddOpen = !state.prodAddOpen; render({ keepScroll: true }); return true; }
   if (act === 'setProdLibFilter'){
     const key = t.dataset.filter || 'all';
     state.prodLibFilter = (key === 'all' || state.prodLibFilter === key) ? 'all' : key;
@@ -9658,7 +9719,7 @@ view.addEventListener('change', e => { if (e.target.id === 'planStartInput'){ co
     } else if (e.target.id === 'prodPhoto' || e.target.id === 'prodCamera'){
       const input = e.target;
       const file = input.files && input.files[0];
-      if (!file){ setPhotoStatus('✗ 没有拿到照片：请重新点按钮再试；拍照失败时可改用「🖼 从相册选图识别」', true); return; }
+      if (!file){ setPhotoStatus('✗ 没有拿到照片：请重新点按钮再试；拍照失败时可改用「🖼 相册识别」', true); return; }
       photoBusy(true);
       const btns = ['prodPhotoBtn','prodCameraBtn'].map(id => document.getElementById(id)).filter(Boolean);
       const labels = btns.map(b => b.textContent);
@@ -9668,11 +9729,11 @@ view.addEventListener('change', e => { if (e.target.id === 'planStartInput'){ co
       setPhotoStatus('① 正在读取照片…');
       btns.forEach(b => { b.disabled = true; b.textContent = '⏳ AI 识别中…'; });
       const reader = new FileReader();
-      reader.onerror = () => { setPhotoStatus('✗ 照片读取失败，请换一张或改用「🖼 从相册选图识别」', true); restore(); };
+      reader.onerror = () => { setPhotoStatus('✗ 照片读取失败，请换一张或改用「🖼 相册识别」', true); restore(); };
       reader.onabort = () => { setPhotoStatus('✗ 照片读取被中断，请重试', true); restore(); };
       reader.onload = async ev => {
         const raw = ev.target && ev.target.result;
-        if (!raw || String(raw).indexOf('data:image') !== 0 || String(raw).length < 128){ setPhotoStatus('✗ 照片内容为空：请改用「🖼 从相册选图识别」重新选一张', true); restore(); return; }
+        if (!raw || String(raw).indexOf('data:image') !== 0 || String(raw).length < 128){ setPhotoStatus('✗ 照片内容为空：请改用「🖼 相册识别」重新选一张', true); restore(); return; }
         showPickedPhoto('prodPhotoPreview', raw);   /* ★ 立刻显示已选照片，与 AI 结果无关 */
         if (wrap) wrap.style.display = 'block';
         try {

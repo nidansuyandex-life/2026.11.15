@@ -46,6 +46,7 @@ public class WalkTimerService extends Service {
     private static final String CHANNEL_ID = "walk_timer_channel_high";
     private static final int NOTIFICATION_ID = 101;
     private static final int ALERT_NOTIFICATION_ID = 102;
+    private static final int START_ALERT_NOTIFICATION_ID = 103;
 
     /** 供 JsBridge 判断是否已在跑，避免重复 startForegroundService */
     public static volatile boolean sRunning = false;
@@ -53,9 +54,47 @@ public class WalkTimerService extends Service {
     /** 本次倒计时结束的绝对时刻（0 = 没有在计时）。页面回前台时用它接续剩余秒数 */
     private static volatile long sEndTs = 0;
 
-    /** 还剩多少秒（0 = 没在跑）。给 JsBridge.getWalkRemainingSec() 用 */
-    public static int remainingSec() {
+    /** ★ 结束时刻同时落到 SharedPreferences：进程被系统杀掉 / 被用户划掉后，
+     *  静态变量会清零，但倒计时本身还在走（兜底闹钟还在）。页面重新打开时
+     *  靠这份持久化时间把剩余秒数接回来，而不是显示「没有在计时」。 */
+    private static final String STATE_PREFS = "WalkTimerState";
+    private static final String K_END_TS = "endTs";
+
+    private static void saveEndTs(Context ctx, long ts) {
+        try {
+            if (ctx == null) return;
+            ctx.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE)
+               .edit().putLong(K_END_TS, ts).apply();
+        } catch (Throwable ignored) {}
+    }
+
+    private static void clearEndTs(Context ctx) {
+        try {
+            if (ctx == null) return;
+            ctx.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE)
+               .edit().remove(K_END_TS).apply();
+        } catch (Throwable ignored) {}
+    }
+
+    /** 结束时刻：优先内存，进程重建后回落到持久化值；已过期则顺手清掉 */
+    public static long endTs(Context ctx) {
         long ts = sEndTs;
+        if (ts > 0) return ts;
+        if (ctx == null) return 0;
+        try {
+            long saved = ctx.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE)
+                            .getLong(K_END_TS, 0L);
+            if (saved <= 0) return 0;
+            if (saved <= System.currentTimeMillis()) { clearEndTs(ctx); return 0; }
+            return saved;
+        } catch (Throwable t) {
+            return 0;
+        }
+    }
+
+    /** 还剩多少秒（0 = 没在跑）。给 JsBridge.getWalkRemainingSec() 用 */
+    public static int remainingSec(Context ctx) {
+        long ts = endTs(ctx);
         if (ts <= 0) return 0;
         long left = ts - System.currentTimeMillis();
         return left <= 0 ? 0 : (int) Math.ceil(left / 1000.0);
@@ -115,6 +154,11 @@ public class WalkTimerService extends Service {
         ensureForeground();
 
         try {
+            /* P61：「＋1 分钟」——把结束时刻整体往后推，页面 / 通知 / 兜底闹钟保持同一个终点 */
+            if (intent != null && intent.hasExtra("extend")) {
+                extendBy(intent.getIntExtra("extend", 60));
+                return START_NOT_STICKY;
+            }
             if (intent != null && intent.hasExtra("duration")) {
                 // 已在倒计时中（闹钟 + JS 重复触发同一时刻）：不重置，沿用已有计时
                 if (timer != null) return START_NOT_STICKY;
@@ -129,6 +173,13 @@ public class WalkTimerService extends Service {
                 // 安排兜底「时间到」闹钟：即便服务被国产 ROM 后台清理杀掉，到点也能提醒
                 try { WalkEndReceiver.schedule(getApplicationContext(), seconds); } catch (Throwable ignored) {}
                 startTimer(seconds * 1000L);
+                /* ★ App 不在前台（被挤到后台 / 被杀后由闹钟拉起）：
+                   前台服务那条常驻通知优先级低、不会打扰用户，所以再补一条「全屏提醒」，
+                   锁屏或其他 App 界面上也能把倒计时界面顶出来；点开即带上打开倒计时的标记。 */
+                if (!MainActivity.isAppForeground()) {
+                    /* P61：后台到点要有声音 —— 改走强提醒渠道（闹铃音 + 长震动 + 全屏） */
+                    try { WalkAlertNotifier.showStart(getApplicationContext(), seconds); } catch (Throwable ignored) {}
+                }
             }
         } catch (Throwable t) {
             Log.e(TAG, "onStartCommand failed", t);
@@ -171,6 +222,7 @@ public class WalkTimerService extends Service {
     private Notification buildNotification(String title, String content, boolean ongoing) {
         Intent intent = new Intent(this, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        intent.putExtra(MainActivity.EXTRA_WALK_UI, true);
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) flags |= PendingIntent.FLAG_IMMUTABLE;
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, flags);
@@ -196,6 +248,7 @@ public class WalkTimerService extends Service {
 
     private void startTimer(long ms) {
         sEndTs = System.currentTimeMillis() + ms;
+        saveEndTs(getApplicationContext(), sEndTs);
         try {
             if (timer != null) timer.cancel();
         } catch (Throwable ignored) {}
@@ -212,6 +265,7 @@ public class WalkTimerService extends Service {
 
                 @Override public void onFinish() {
                     sEndTs = 0;
+                    clearEndTs(getApplicationContext());
                     if (destroyed) return;
                     // 倒计时正常走到 0：取消兜底闹钟，避免重复提醒
                     try { WalkEndReceiver.cancel(getApplicationContext()); } catch (Throwable ignored) {}
@@ -237,8 +291,8 @@ public class WalkTimerService extends Service {
                     // 3. 语音
                     safeSpeak("时间到，请站起来活动一下", "end");
 
-                    // 4. 完成通知（权限可能已被回收，必须包住）
-                    try { showAlertNotification("活动结束", "可以回到座位继续工作了"); }
+                    // 4. 完成通知：强提醒渠道（闹铃音 + 长震动 + 全屏），锁屏也看得见
+                    try { WalkAlertNotifier.showEnd(getApplicationContext()); }
                     catch (Throwable ignored) {}
 
                     // 5. 延迟收尾
@@ -253,6 +307,26 @@ public class WalkTimerService extends Service {
         }
     }
 
+    /**
+     * 把本次倒计时整体延长 addSec 秒：重开一个 CountDownTimer，并重排「时间到」的兜底闹钟，
+     * 这样页面上的数字、常驻通知、兜底闹钟三者的结束时刻永远一致。
+     */
+    private void extendBy(int addSec) {
+        try {
+            if (timer == null || sEndTs <= 0) return;
+            long left = sEndTs - System.currentTimeMillis();
+            if (left < 0) left = 0;
+            long ms = left + Math.max(1, addSec) * 1000L;
+            try { timer.cancel(); } catch (Throwable ignored) {}
+            timer = null;
+            startTimer(ms);
+            try { WalkEndReceiver.schedule(getApplicationContext(), (int) Math.ceil(ms / 1000.0)); } catch (Throwable ignored) {}
+            safeSpeak("已延长一分钟", "extend");
+        } catch (Throwable t) {
+            Log.e(TAG, "extendBy failed", t);
+        }
+    }
+
     private boolean canPostNotifications() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true;
         return ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
@@ -260,24 +334,12 @@ public class WalkTimerService extends Service {
     }
 
     private void showAlertNotification(String title, String content) {
-        if (!canPostNotifications()) return;   // Android 13+ 未授权时 nm.notify 会抛 SecurityException
-        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        if (manager == null) return;
+        WalkAlertNotifier.showEnd(this);
+    }
 
-        Intent intent = new Intent(this, MainActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) flags |= PendingIntent.FLAG_IMMUTABLE;
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 1, intent, flags);
-
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle(title)
-                .setContentText(content)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
-                .setContentIntent(pendingIntent)
-                .setAutoCancel(true)
-                .setPriority(NotificationCompat.PRIORITY_HIGH);
-        manager.notify(ALERT_NOTIFICATION_ID, builder.build());
+    /** 后台触发时的「全屏提醒」：把倒计时界面直接顶到用户面前，而不是只躺在通知栏 */
+    private void showWalkStartAlert(int seconds) {
+        WalkAlertNotifier.showStart(this, seconds);
     }
 
     @Nullable @Override public IBinder onBind(Intent intent) { return null; }
@@ -285,6 +347,7 @@ public class WalkTimerService extends Service {
     @Override public void onDestroy() {
         sRunning = false;
         sEndTs = 0;
+        clearEndTs(getApplicationContext());
         destroyed = true;
         try { mainHandler.removeCallbacksAndMessages(null); } catch (Throwable ignored) {}
         try { if (timer != null) timer.cancel(); } catch (Throwable ignored) {}

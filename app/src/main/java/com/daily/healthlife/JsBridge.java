@@ -145,14 +145,116 @@ public class JsBridge {
 
     /**
      * 原生倒计时还剩多少秒（0 = 没在跑）。
-     * 用途：App 被闹钟在后台叫醒、页面没起过倒计时，回到前台时用来接着显示。
+     * 用途：App 被闹钟在后台叫醒、或进程被杀后重新打开时，用来接着显示剩余秒数。
+     * 结束时刻有持久化，所以进程重建后也能拿到正确的剩余时间。
      */
     @JavascriptInterface
     public int getWalkRemainingSec() {
         try {
-            return WalkTimerService.remainingSec();
+            Context ctx = (act != null) ? act.getApplicationContext() : App.context();
+            return WalkTimerService.remainingSec(ctx);
         } catch (Throwable t) {
             return 0;
+        }
+    }
+
+    /** 原生前台服务是否还在跑：用来判断「到点」该由原生播报还是页面自己补播 */
+    @JavascriptInterface
+    public boolean isNativeWalkRunning() {
+        try { return WalkTimerService.sRunning; } catch (Throwable t) { return false; }
+    }
+
+    /** P61：「＋1 分钟」——服务在跑就把结束时刻整体往后推，没在跑则忽略 */
+    @JavascriptInterface
+    public void extendNativeWalkTimer(int seconds) {
+        try {
+            Context ctx = act.getApplicationContext();
+            if (!WalkTimerService.sRunning) return;
+            Intent i = new Intent(ctx, WalkTimerService.class);
+            i.putExtra("extend", Math.max(1, seconds));
+            ctx.startService(i);      // 服务已是前台状态，这里不会被「后台启动服务」限制
+        } catch (Throwable ignored) {}
+    }
+
+    /** P61：设置页「试一次」——立刻弹一条强提醒，验证权限 / 音量 / 全屏是否真的生效 */
+    @JavascriptInterface
+    public void testWalkAlert() {
+        try {
+            WalkAlertNotifier.testNow(act.getApplicationContext());
+        } catch (Throwable ignored) {}
+    }
+
+    /**
+     * P61：一次把「提醒到底能不能响」的三件事告诉页面：
+     * notif = 通知权限；exact = 精确闹钟；battery = 是否已忽略电池优化（不被后台清理）。
+     */
+    @JavascriptInterface
+    public String getWalkAlertStatus() {
+        try {
+            Context ctx = act.getApplicationContext();
+            org.json.JSONObject o = new org.json.JSONObject();
+            boolean notif;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                notif = ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.POST_NOTIFICATIONS)
+                        == android.content.pm.PackageManager.PERMISSION_GRANTED;
+            } else {
+                NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+                notif = nm == null || nm.areNotificationsEnabled();
+            }
+            boolean exact = true;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                android.app.AlarmManager am = (android.app.AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
+                exact = am != null && am.canScheduleExactAlarms();
+            }
+            boolean battery = true;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                android.os.PowerManager pm = (android.os.PowerManager) ctx.getSystemService(Context.POWER_SERVICE);
+                battery = pm != null && pm.isIgnoringBatteryOptimizations(ctx.getPackageName());
+            }
+            o.put("notif", notif);
+            o.put("exact", exact);
+            o.put("battery", battery);
+            return o.toString();
+        } catch (Throwable t) {
+            return "{}";
+        }
+    }
+
+    /** P61：跳到本应用的通知设置（关掉「允许通知」是最常见的「到点不响」原因） */
+    @JavascriptInterface
+    public void openNotifSettings() {
+        try {
+            Context ctx = act.getApplicationContext();
+            Intent i = new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+            i.putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, ctx.getPackageName());
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            ctx.startActivity(i);
+        } catch (Throwable t) {
+            try {
+                Context ctx = act.getApplicationContext();
+                Intent i2 = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:" + ctx.getPackageName()));
+                i2.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                ctx.startActivity(i2);
+            } catch (Throwable ignored) {}
+        }
+    }
+
+    /** P61：跳到电池优化白名单，避免国产 ROM 把后台提醒一起清掉 */
+    @JavascriptInterface
+    public void openBatterySettings() {
+        try {
+            Context ctx = act.getApplicationContext();
+            Intent i = new Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            ctx.startActivity(i);
+        } catch (Throwable t) {
+            try {
+                Context ctx = act.getApplicationContext();
+                Intent i2 = new Intent(android.provider.Settings.ACTION_SETTINGS);
+                i2.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                ctx.startActivity(i2);
+            } catch (Throwable ignored) {}
         }
     }
 
@@ -345,6 +447,23 @@ public class JsBridge {
                 act.startActivity(new Intent("android.intent.action.VIEW_DOWNLOADS").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             } catch (Exception ignored) {}
         });
+    }
+
+    /** P66：把「多久可能来一条」交给系统闹钟；minutes=0 取消 */
+    @JavascriptInterface
+    public void syncCompanionPing(int minutes, String name, String last) {
+        try {
+            CompanionPingReceiver.sync(act.getApplicationContext(), minutes, name, last);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    @JavascriptInterface
+    public void cancelCompanionPing() {
+        try {
+            CompanionPingReceiver.cancel(act.getApplicationContext());
+        } catch (Throwable ignored) {
+        }
     }
 
     @JavascriptInterface

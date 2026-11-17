@@ -228,50 +228,11 @@ public class WalkAlarmReceiver extends BroadcastReceiver {
     }
 
     private void showNotification(Context ctx) {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS)
-                        != PackageManager.PERMISSION_GRANTED) return;
-            }
-            NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
-            if (nm == null) return;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                NotificationChannel ch = new NotificationChannel(CHANNEL, "站立走动提醒", NotificationManager.IMPORTANCE_HIGH);
-                ch.setDescription("工作日定时提醒起身活动");
-                ch.enableVibration(true);
-                ch.setVibrationPattern(new long[]{0, 400, 180, 400});
-                nm.createNotificationChannel(ch);
-            }
-            Intent open = new Intent(ctx, MainActivity.class);
-            open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) flags |= PendingIntent.FLAG_IMMUTABLE;
-            PendingIntent content = PendingIntent.getActivity(ctx, REQ_NOTIFY, open, flags);
-
-            NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, CHANNEL)
-                    .setSmallIcon(android.R.drawable.ic_dialog_info)
-                    .setContentTitle("该站起来走动了")
-                    .setContentText("活动 200 秒，回来继续～")
-                    .setPriority(NotificationCompat.PRIORITY_HIGH)
-                    .setCategory(NotificationCompat.CATEGORY_REMINDER)
-                    .setAutoCancel(true)
-                    .setVibrate(new long[]{0, 400, 180, 400})
-                    .setContentIntent(content);
-            nm.notify(REQ_NOTIFY, b.build());
-        } catch (Exception ignored) {
-        }
+        /* 服务没起来时的降级提醒：同样走强提醒，别让用户干等 */
+        WalkAlertNotifier.showStart(ctx, 200);
     }
 
     private void vibrate(Context ctx) {
-        try {
-            Vibrator v = (Vibrator) ctx.getSystemService(Context.VIBRATOR_SERVICE);
-            if (v == null) return;
-            if (Build.VERSION.SDK_INT >= 26) {
-                v.vibrate(VibrationEffect.createWaveform(new long[]{0, 400, 180, 400}, -1));
-            } else {
-                v.vibrate(new long[]{0, 400, 180, 400}, -1);
-            }
-        } catch (Exception ignored) {
-        }
+        WalkAlertNotifier.vibrate(ctx);
     }
 }

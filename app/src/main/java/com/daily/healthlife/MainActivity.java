@@ -51,6 +51,16 @@ public class MainActivity extends AppCompatActivity {
     private volatile boolean mDestroyed = false;
     /** 系统文件选择器/相机打开期间为 true：此时 onResume 不得整页重绘 */
     private volatile boolean mFileChooserBusy = false;
+    /** 通知/闹钟带着「打开走动倒计时」标记进来，等页面加载完再执行 */
+    public static final String EXTRA_WALK_UI = "healthlife_walk_ui";
+    /** P61：到点后的「活动结束」提醒用另一个标记，页面弹「完成」卡片，而不是又起一轮倒计时 */
+    public static final String EXTRA_WALK_END = "healthlife_walk_end";
+    /** P66：陪聊主动消息的通知被点开，进页面后让 TA 把那句话说出来 */
+    public static final String EXTRA_COMPANION_PING = "healthlife_companion_ping";
+    private volatile boolean mPendingCompanion = false;
+    private volatile boolean mPendingWalkUi = false;
+    private volatile boolean mPendingWalkEnd = false;
+    private volatile boolean mPageLoaded = false;
     private volatile long mFileChooserTs = 0L;
 
     /** 供 WalkAlarmReceiver 判断 App 是否在前台、以及直接调用页面里的方法 */
@@ -100,6 +110,8 @@ public class MainActivity extends AppCompatActivity {
         try { checkPermissions(); } catch (Throwable t) { Log.e(TAG, "permission failed", t); }
         // 装机后第一次打开就排上晚间提醒（页面 JS 未必进过设置页）
         try { EveningReminderReceiver.scheduleNext(getApplicationContext()); } catch (Throwable ignored) {}
+        try { handleWalkIntent(getIntent()); } catch (Throwable ignored) {}
+        try { handleCompanionIntent(getIntent()); } catch (Throwable ignored) {}
         try { handleJumpIntent(getIntent()); } catch (Throwable ignored) {}
     }
 
@@ -211,11 +223,15 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
+                mPageLoaded = true;
                 // 页面加载完成后，合并桌面小组件的打卡状态
                 try {
                     view.postDelayed(() -> {
                         try { MainActivity.runJs("window.mergeNativeWidgetCheckins && window.mergeNativeWidgetCheckins()"); }
                         catch (Throwable ignored) {}
+                        // 进程被杀后由通知/提醒拉起：页面就绪后再弹倒计时
+                        try { fireWalkUiIfPending(); } catch (Throwable ignored) {}
+                        try { fireCompanionIfPending(); } catch (Throwable ignored) {}
                     }, 250);
                 } catch (Throwable ignored) {}
             }
@@ -616,7 +632,62 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        try { handleWalkIntent(intent); } catch (Throwable ignored) {}
+        try { handleCompanionIntent(intent); } catch (Throwable ignored) {}
         try { handleJumpIntent(intent); } catch (Throwable ignored) {}
+    }
+
+    /**
+     * 走动提醒的通知/全屏提醒点了「进来」：让页面把 200 秒倒计时弹出来。
+     * 场景：App 被杀、或被挤到后台，提醒触发时页面并不知道；
+     * 这里通过 Intent 标记把「该弹倒计时」这件事带进来。
+     */
+    private void handleWalkIntent(Intent intent) {
+        try {
+            if (intent == null) return;
+            boolean isEnd = intent.getBooleanExtra(EXTRA_WALK_END, false);
+            if (!intent.getBooleanExtra(EXTRA_WALK_UI, false) && !isEnd) return;
+            intent.removeExtra(EXTRA_WALK_UI);
+            intent.removeExtra(EXTRA_WALK_END);
+            mPendingWalkUi = true;
+            mPendingWalkEnd = isEnd;
+            if (webView != null && mPageLoaded && !mDestroyed) {
+                webView.postDelayed(() -> { try { fireWalkUiIfPending(); } catch (Throwable ignored) {} }, 300);
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private void fireWalkUiIfPending() {
+        if (!mPendingWalkUi) return;
+        mPendingWalkUi = false;
+        boolean endUi = mPendingWalkEnd;
+        mPendingWalkEnd = false;
+        String js = endUi
+                ? "window.onNativeWalkEnd && window.onNativeWalkEnd(true)"
+                : "window.onNativeWalkAlarm && window.onNativeWalkAlarm(true)";
+        try { MainActivity.runJs(js); }
+        catch (Throwable ignored) {}
+    }
+
+    /** 陪聊通知点进来：交给页面切到陪聊页并让 TA 主动开口 */
+    private void handleCompanionIntent(Intent intent) {
+        try {
+            if (intent == null) return;
+            if (!intent.getBooleanExtra(EXTRA_COMPANION_PING, false)) return;
+            intent.removeExtra(EXTRA_COMPANION_PING);
+            mPendingCompanion = true;
+            if (webView != null && mPageLoaded && !mDestroyed) {
+                webView.postDelayed(() -> { try { fireCompanionIfPending(); } catch (Throwable ignored) {} }, 300);
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private void fireCompanionIfPending() {
+        if (!mPendingCompanion) return;
+        mPendingCompanion = false;
+        try { MainActivity.runJs("window.onCompanionPing && window.onCompanionPing(true)"); }
+        catch (Throwable ignored) {}
     }
 
     private void handleJumpIntent(Intent intent) {

@@ -11,6 +11,8 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- 走动提醒：允许在全屏通知里直接拉起 App（锁屏 / 其他 App 界面也能自己跳出来） -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <!-- 拍照识别：不声明也能靠系统相机 App 兜底，声明后部分机型可直接调用相机 -->
     <uses-permission android:name="android.permission.CAMERA" />
 
@@ -83,6 +85,16 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- P66 陪聊主动消息：App 被杀也能收到「TA 发来一条消息」，点开由页面现场生成 -->
+        <receiver android:name=".CompanionPingReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="com.daily.healthlife.COMPANION_PING" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+            </intent-filter>
+        </receiver>
 
         <!-- 手动待办：到点提醒。每条待办一个独立闹钟，删除/完成/过期由页面调用取消 -->
         <receiver android:name=".TodoAlarmReceiver" android:exported="false">

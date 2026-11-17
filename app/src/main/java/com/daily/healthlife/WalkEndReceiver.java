@@ -76,49 +76,11 @@ public class WalkEndReceiver extends BroadcastReceiver {
     }
 
     private void showAlert(Context ctx) {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS)
-                        != PackageManager.PERMISSION_GRANTED) return;
-            }
-            NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
-            if (nm == null) return;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                NotificationChannel ch = new NotificationChannel(CHANNEL, "健康生活提醒", NotificationManager.IMPORTANCE_HIGH);
-                ch.enableVibration(true);
-                ch.setSound(null, null); // 震动由下方 Vibrator 接管
-                nm.createNotificationChannel(ch);
-            }
-            Intent open = new Intent(ctx, MainActivity.class);
-            open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) flags |= PendingIntent.FLAG_IMMUTABLE;
-            PendingIntent content = PendingIntent.getActivity(ctx, 4304, open, flags);
-
-            NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, CHANNEL)
-                    .setSmallIcon(android.R.drawable.ic_dialog_info)
-                    .setContentTitle("活动结束")
-                    .setContentText("可以回到座位继续工作了")
-                    .setPriority(NotificationCompat.PRIORITY_HIGH)
-                    .setCategory(NotificationCompat.CATEGORY_ALARM)
-                    .setAutoCancel(true)
-                    .setVibrate(new long[]{0, 400, 180, 400})
-                    .setContentIntent(content);
-            nm.notify(102, b.build());
-        } catch (Exception ignored) {
-        }
+        /* P61：统一走 WalkAlertNotifier —— 闹铃音 + 长震动 + 全屏，不再是一条安静的通知 */
+        WalkAlertNotifier.showEnd(ctx);
     }
 
     private void vibrate(Context ctx) {
-        try {
-            Vibrator v = (Vibrator) ctx.getSystemService(Context.VIBRATOR_SERVICE);
-            if (v == null) return;
-            if (Build.VERSION.SDK_INT >= 26) {
-                v.vibrate(VibrationEffect.createWaveform(new long[]{0, 400, 180, 400}, -1));
-            } else {
-                v.vibrate(new long[]{0, 400, 180, 400}, -1);
-            }
-        } catch (Exception ignored) {
-        }
+        WalkAlertNotifier.vibrate(ctx);
     }
 }

@@ -9,6 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.media.AudioAttributes;
+import android.media.AudioManager;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
@@ -142,7 +143,11 @@ public final class WalkAlertNotifier {
                     .setContentIntent(pi)
                     .setFullScreenIntent(pi, true);
             Uri sound = alarmSound();
-            if (sound != null) b.setSound(sound, audioAttrs());
+            /* NotificationCompat.Builder 的二参重载是 (Uri, 音频流类型 int)，
+               不是 (Uri, AudioAttributes)——传 AudioAttributes 编译不过。
+               API 26+ 声音由渠道决定（渠道里已设 USAGE_ALARM），这里的 stream
+               只对 Android 7 及更早生效，所以明确写「闹钟流」，别退回通知音。 */
+            if (sound != null) b.setSound(sound, AudioManager.STREAM_ALARM);
             nm.notify(id, b.build());
         } catch (Throwable ignored) {}
     }
